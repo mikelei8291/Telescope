@@ -1,3 +1,4 @@
+use redis::aio::MultiplexedConnection;
 use teloxide::{prelude::*, types::{InlineKeyboardButton, InlineKeyboardMarkup}, utils::command::BotCommands, RequestError};
 
 use crate::subscription::{parse_url, Subscription};
@@ -29,16 +30,21 @@ fn make_reply_markup(action: &str) -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(keyboard)
 }
 
-pub async fn command_handler(bot: Bot, msg: Message, cmd: Command) -> Result<(), RequestError> {
+pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: MultiplexedConnection) -> Result<(), RequestError> {
     match cmd {
         Command::Start => bot.send_message(
             msg.chat.id, "Welcome to the Telescope bot. You can view a list of available commands using the /help command."
         ).await?,
         Command::Help => bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?,
-        Command::Sub(sub) => bot.send_message(
-            msg.chat.id,
-            format!("Please confirm that you want to subscribe to {} user: {}", sub.platform, sub.user_id)
-        ).reply_markup(make_reply_markup("sub")).await?,
+        Command::Sub(sub) => {
+            let reply = bot.send_message(
+                msg.chat.id,
+                format!("Please confirm that you want to subscribe to {} user: {}", sub.platform, sub.user_id)
+            ).reply_markup(make_reply_markup("sub")).await?;
+            let key = format!("{}-{}", reply.chat.id, reply.id);
+            redis::pipe().atomic().set(&key, sub.to_string()).expire(&key, 86400).exec_async(&mut db).await.unwrap();
+            reply
+        }
         Command::Del(sub) => bot.send_message(
             msg.chat.id,
             format!("Please confirm that you want to unsubscribe to {} user: {}", sub.platform, sub.user_id)
