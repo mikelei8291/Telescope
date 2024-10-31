@@ -12,11 +12,7 @@
   ```mermaid
   flowchart LR
     subgraph s1["Add subscription"]
-      n1{"Find<br>Platform:user_id pair<br>in 'subs' set"}
-      n1 -- Found --> n2["Add Telegram user ID to the set named with the pair"]
-      n1 -- Not Found --> n3["Add the pair to the 'subs' set"]
-      n3 --> n2
-      n2 --> n4(["Add the pair to the<br>set named with the Telegram user ID"])
+      n1["Add Telegram user ID to the set named with sub:Platform:user_id"] --> n2(["Add the pair without the sub: prefix to the<br>set named with the Telegram user ID"])
     end
     A["/sub &lt;url&gt;"] --> B{"Parse URL"}
     B -- Supported Service --> C{"Parse username"}
@@ -32,10 +28,8 @@
   ```mermaid
   flowchart LR
     subgraph s1["Delete subscription"]
-      n1["Find Platform:user_id pair in 'subs' set"]
-      n1 --> n2["Remove Platform:user_id pair in 'subs' set"]
-      n2 --> n3["Remove Telegram user ID from the set named with the pair"]
-      n3 --> n4(["Remove the pair from the set named with the Telegram user ID"])
+      n3["Remove Telegram user ID from the set named with sub:Platform:user_id"]
+      n3 --> n4(["Remove the pair without the sub: prefix from the set named with the Telegram user ID"])
     end
     A["/del &lt;url&gt;"] --> B{"Parse URL"}
     B -- Supported Service --> C{"Get username"}
@@ -51,8 +45,8 @@
   ```mermaid
   flowchart LR
     subgraph s1["Get user subscription"]
-      n1["Find Telegram user ID in users hashtable"]
-      n2(["Return list value"])
+      n1["Get the set named with the Telegram user ID"]
+      n2(["Iterate over the set and return list value"])
       n1 --> n2
     end
     A["/list"] --> s1
