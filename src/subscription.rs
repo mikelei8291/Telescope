@@ -1,3 +1,4 @@
+use core::fmt;
 use std::str::FromStr;
 
 use lazy_static::lazy_static;
@@ -27,6 +28,12 @@ impl Platform {
 pub struct Subscription {
     pub platform: Platform,
     pub user_id: String
+}
+
+impl fmt::Display for Subscription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.platform, self.user_id)
+    }
 }
 
 pub enum SubscriptionError {
