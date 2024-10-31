@@ -14,3 +14,4 @@ regex = "1.11.1"
 strum = "0.26.3"
 strum_macros = "0.26.4"
 lazy_static = "1.5.0"
+redis = { version = "0.27.5", features = ["aio", "tokio-comp"] }
