@@ -12,14 +12,11 @@
   ```mermaid
   flowchart LR
     subgraph s1["Add subscription"]
-      n1{"Find subscription user ID in subs hashtable"}
-      n1 -- Found --> n2["Add Telegram user ID to returned list"]
-      n1 -- Not Found --> n3["Add subscription user ID as the key to the subs hashtable"]
+      n1{"Find<br>Platform:user_id pair<br>in 'subs' set"}
+      n1 -- Found --> n2["Add Telegram user ID to the set named with the pair"]
+      n1 -- Not Found --> n3["Add the pair to the 'subs' set"]
       n3 --> n2
-      n2 --> n4{"Find Telegram user ID in users hashtable"}
-      n4 -- Found --> n5(["Add subscription user ID to the returned list"])
-      n4 -- Not Found --> n6["Add Telegram user ID as the key to the users hashtable"]
-      n6 --> n5
+      n2 --> n4(["Add the pair to the<br>set named with the Telegram user ID"])
     end
     A["/sub &lt;url&gt;"] --> B{"Parse URL"}
     B -- Supported Service --> C{"Parse username"}
@@ -35,20 +32,10 @@
   ```mermaid
   flowchart LR
     subgraph s1["Delete subscription"]
-      n1["Find subscription user ID in subs hashtable"]
-      n2{"Is the Telegram user ID the only element in the returned list?"}
-      n1 --> n2
-      n2 -- Yes --> n3["Remove the entire key from the subs hashtable"]
-      n2 -- No --> n4["Remove Telegram user ID from returned list"]
-      n5["Find Telegram user ID in users hashtable"]
-      n3 --> n5
-      n4 --> n5
-      n5 --> n6{"Is the subscription user ID the only element in the returned list?"}
-      n6 -- Yes --> n7["Remove the entire key from the users hashtable"]
-      n6 -- No --> n8["Remove subscription user ID from returned list"]
-      n9(["Finish"])
-      n7 --> n9
-      n8 --> n9
+      n1["Find Platform:user_id pair in 'subs' set"]
+      n1 --> n2["Remove Platform:user_id pair in 'subs' set"]
+      n2 --> n3["Remove Telegram user ID from the set named with the pair"]
+      n3 --> n4(["Remove the pair from the set named with the Telegram user ID"])
     end
     A["/del &lt;url&gt;"] --> B{"Parse URL"}
     B -- Supported Service --> C{"Get username"}
