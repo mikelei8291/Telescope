@@ -1,20 +1,15 @@
+use std::str::FromStr;
+
+use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use teloxide::utils::command::ParseError;
 use url::Url;
-use lazy_static::lazy_static;
 
-#[derive(Clone, strum_macros::Display)]
+#[derive(Clone, strum_macros::Display, strum_macros::EnumString)]
 pub enum Platform {
     #[strum(to_string = "Twitter Space")]
     TwitterSpace
 }
-
-#[derive(Clone)]
-pub struct Subscription {
-    pub platform: Platform,
-    pub user_id: String
-}
-
 
 impl Platform {
     pub fn parse_user(self: &Self, path: &str) -> Option<String> {
@@ -25,6 +20,32 @@ impl Platform {
         match self {
             Platform::TwitterSpace => TWITTER_USERNAME.captures(path).and_then(get_group)
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Subscription {
+    pub platform: Platform,
+    pub user_id: String
+}
+
+pub enum SubscriptionError {
+    UnsupportedPlatform,
+    InvalidFormat
+}
+
+impl FromStr for Subscription {
+    type Err = SubscriptionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let split: Vec<&str> = s.split(":").collect();
+        let (Some(&platform_str), Some(&user_id)) = (split.get(0), split.get(1)) else {
+            return Err(SubscriptionError::InvalidFormat);
+        };
+        let Ok(platform) = Platform::from_str(platform_str) else {
+            return Err(SubscriptionError::UnsupportedPlatform);
+        };
+        Ok(Subscription { platform, user_id: user_id.to_string() })
     }
 }
 
