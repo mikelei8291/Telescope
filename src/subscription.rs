@@ -33,7 +33,7 @@ fn parse_subscription(host: &str, path: &str) -> Result<Subscription, ParseError
         "twitter.com" | "x.com" => Some(Platform::TwitterSpace),
         _ => None
     } {
-        if let Some(user_id) = platform.clone().parse_user(path) {
+        if let Some(user_id) = platform.parse_user(path) {
             return Ok(Subscription { platform, user_id });
         } else {
             return Err(ParseError::IncorrectFormat("Invalid username".into()));
