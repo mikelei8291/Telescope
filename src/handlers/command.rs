@@ -30,25 +30,26 @@ fn make_reply_markup(action: &str) -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(keyboard)
 }
 
-pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: MultiplexedConnection) -> Result<(), RequestError> {
+async fn send_reply(
+    bot: Bot, chat_id: ChatId, sub: Subscription, mut db: MultiplexedConnection, text: &str, action: &str
+) -> Result<Message, RequestError> {
+    let reply = bot.send_message(
+        chat_id,
+        format!("Please confirm that you want to {text} to {} user: {}", sub.platform, sub.user_id)
+    ).reply_markup(make_reply_markup(action)).await?;
+    let key = format!("{}:{}", reply.chat.id, reply.id);
+    redis::pipe().atomic().set(&key, sub.to_string()).expire(&key, 86400).exec_async(&mut db).await.unwrap();
+    Ok(reply)
+}
+
+pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, db: MultiplexedConnection) -> Result<(), RequestError> {
     match cmd {
         Command::Start => bot.send_message(
             msg.chat.id, "Welcome to the Telescope bot. You can view a list of available commands using the /help command."
         ).await?,
         Command::Help => bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?,
-        Command::Sub(sub) => {
-            let reply = bot.send_message(
-                msg.chat.id,
-                format!("Please confirm that you want to subscribe to {} user: {}", sub.platform, sub.user_id)
-            ).reply_markup(make_reply_markup("sub")).await?;
-            let key = format!("{}:{}", reply.chat.id, reply.id);
-            redis::pipe().atomic().set(&key, sub.to_string()).expire(&key, 86400).exec_async(&mut db).await.unwrap();
-            reply
-        }
-        Command::Del(sub) => bot.send_message(
-            msg.chat.id,
-            format!("Please confirm that you want to unsubscribe to {} user: {}", sub.platform, sub.user_id)
-        ).reply_markup(make_reply_markup("del")).await?,
+        Command::Sub(sub) => send_reply(bot, msg.chat.id, sub, db, "subscribe", "sub").await?,
+        Command::Del(sub) => send_reply(bot, msg.chat.id, sub, db, "unsubscribe", "del").await?,
         Command::List => bot.send_message(msg.chat.id, "Your subscriptions:").await?
     };
     respond(())
