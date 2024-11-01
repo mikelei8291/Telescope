@@ -52,12 +52,12 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
         Command::Sub(sub) => send_reply(bot, msg.chat.id, sub, db, "subscribe", "sub").await?,
         Command::Del(sub) => send_reply(bot, msg.chat.id, sub, db, "unsubscribe", "del").await?,
         Command::List => {
-            let Ok(results): Result<AsyncIter<String>, RedisError> = db.sscan(msg.chat.id.to_string()).await else {
-                bot.send_message(msg.chat.id, "Database error").await?;
-                return respond(());
-            };
-            let subs = results.enumerate().map(|(i, r)| format!("{}. {r}", i + 1)).collect::<Vec<String>>().await.join("\n");
-            bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
+            if let Ok(results) = db.sscan::<String, String>(msg.chat.id.to_string()).await {
+                let subs = results.enumerate().map(|(i, r)| format!("{}. {r}", i + 1)).collect::<Vec<String>>().await.join("\n");
+                bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
+            } else {
+                bot.send_message(msg.chat.id, "Database error").await?
+            }
         }
     };
     respond(())
