@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use redis::{aio::MultiplexedConnection, AsyncCommands, AsyncIter, RedisError};
+use redis::{aio::MultiplexedConnection, AsyncCommands};
 use teloxide::{prelude::*, types::{InlineKeyboardButton, InlineKeyboardMarkup}, utils::command::BotCommands, RequestError};
 
 use crate::subscription::{parse_url, Subscription};
@@ -49,10 +49,30 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             msg.chat.id, "Welcome to the Telescope bot. You can view a list of available commands using the /help command."
         ).await?,
         Command::Help => bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?,
-        Command::Sub(sub) => send_reply(bot, msg.chat.id, sub, db, "subscribe", "sub").await?,
-        Command::Del(sub) => send_reply(bot, msg.chat.id, sub, db, "unsubscribe", "del").await?,
+        Command::Sub(sub) => {
+            if let Ok(result) = db.sismember(msg.chat.id.to_string(), sub.to_string()).await {
+                if result {
+                    bot.send_message(msg.chat.id, "You have already subscribed to the user").await?
+                } else {
+                    send_reply(bot, msg.chat.id, sub, db, "subscribe", "sub").await?
+                }
+            } else {
+                bot.send_message(msg.chat.id, "Database error").await?
+            }
+        }
+        Command::Del(sub) => {
+            if let Ok(result) = db.sismember::<_, _, bool>(msg.chat.id.to_string(), sub.to_string()).await {
+                if !result {
+                    bot.send_message(msg.chat.id, "You are not subscribed to the user").await?
+                } else {
+                    send_reply(bot, msg.chat.id, sub, db, "unsubscribe", "del").await?
+                }
+            } else {
+                bot.send_message(msg.chat.id, "Database error").await?
+            }
+        }
         Command::List => {
-            if let Ok(results) = db.sscan::<String, String>(msg.chat.id.to_string()).await {
+            if let Ok(results) = db.sscan::<_, String>(msg.chat.id.to_string()).await {
                 let subs = results.enumerate().map(|(i, r)| format!("{}. {r}", i + 1)).collect::<Vec<String>>().await.join("\n");
                 bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
             } else {
