@@ -1,4 +1,5 @@
-use redis::aio::MultiplexedConnection;
+use futures::StreamExt;
+use redis::{aio::MultiplexedConnection, AsyncCommands, AsyncIter, RedisError};
 use teloxide::{prelude::*, types::{InlineKeyboardButton, InlineKeyboardMarkup}, utils::command::BotCommands, RequestError};
 
 use crate::subscription::{parse_url, Subscription};
@@ -42,7 +43,7 @@ async fn send_reply(
     Ok(reply)
 }
 
-pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, db: MultiplexedConnection) -> Result<(), RequestError> {
+pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: MultiplexedConnection) -> Result<(), RequestError> {
     match cmd {
         Command::Start => bot.send_message(
             msg.chat.id, "Welcome to the Telescope bot. You can view a list of available commands using the /help command."
@@ -50,7 +51,14 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, db: Multiplex
         Command::Help => bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?,
         Command::Sub(sub) => send_reply(bot, msg.chat.id, sub, db, "subscribe", "sub").await?,
         Command::Del(sub) => send_reply(bot, msg.chat.id, sub, db, "unsubscribe", "del").await?,
-        Command::List => bot.send_message(msg.chat.id, "Your subscriptions:").await?
+        Command::List => {
+            let Ok(results): Result<AsyncIter<String>, RedisError> = db.sscan(msg.chat.id.to_string()).await else {
+                bot.send_message(msg.chat.id, "Database error").await?;
+                return respond(());
+            };
+            let subs = results.enumerate().map(|(i, r)| format!("{}. {r}", i + 1)).collect::<Vec<String>>().await.join("\n");
+            bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
+        }
     };
     respond(())
 }
