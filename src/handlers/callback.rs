@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
 use teloxide::{payloads::AnswerCallbackQuerySetters, prelude::Requester, types::CallbackQuery, Bot, RequestError};
@@ -33,10 +32,12 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
                     (format!("You have successfully subscribed to {} user: {}", sub.platform, sub.user_id), pipe)
                 }
                 "del" => {
-                    // Do unsubscribe
-                    (format!("You have successfully unsubscribed to {} user: {}", sub.platform, sub.user_id), pipe.borrow_mut())
+                    let pipe = pipe
+                        .srem(format!("sub:{sub_str}"), &query.from.id.to_string())
+                        .srem(&query.from.id.to_string(), &sub_str);
+                    (format!("You have successfully unsubscribed to {} user: {}", sub.platform, sub.user_id), pipe)
                 }
-                _ => ("Why are we still here? Just to suffer?".to_owned(), pipe.borrow_mut())
+                _ => ("Why are we still here? Just to suffer?".to_owned(), &mut pipe)
             };
             pipe.del(key).exec_async(&mut db).await.unwrap();
             bot.edit_message_text(msg.chat.id, msg.id, text).await?;
