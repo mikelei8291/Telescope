@@ -41,7 +41,7 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
                 msg.chat.id,
                 format!("Please confirm that you want to subscribe to {} user: {}", sub.platform, sub.user_id)
             ).reply_markup(make_reply_markup("sub")).await?;
-            let key = format!("{}-{}", reply.chat.id, reply.id);
+            let key = format!("{}:{}", reply.chat.id, reply.id);
             redis::pipe().atomic().set(&key, sub.to_string()).expire(&key, 86400).exec_async(&mut db).await.unwrap();
             reply
         }

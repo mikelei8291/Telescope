@@ -15,7 +15,7 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
             bot.edit_message_text(msg.chat.id, msg.id, "Cancelled").await?;
             return Ok(());
         }
-        let key = format!("{}-{}", msg.chat.id, msg.id);
+        let key = format!("{}:{}", msg.chat.id, msg.id);
         let Ok(sub_str): Result<Option<String>, RedisError> = db.get(&key).await else {
             bot.answer_callback_query(&query.id).text("Database error").await?;
             return Ok(());
