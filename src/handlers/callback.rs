@@ -1,3 +1,4 @@
+use log::error;
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
 use teloxide::{payloads::AnswerCallbackQuerySetters, prelude::Requester, types::CallbackQuery, RequestError};
 
@@ -21,7 +22,9 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
         };
         if let Some(sub_str) = sub_str {
             let Ok(sub) = sub_str.parse::<Subscription>() else {
-                panic!("Wrong, too wrong");
+                bot.answer_callback_query(&query.id).text("Database error").await?;
+                error!("Wrong, too wrong");
+                return Ok(());
             };
             let mut pipe = redis::pipe().atomic().to_owned();
             let (text, pipe) = match data.as_str() {
