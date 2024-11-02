@@ -1,5 +1,6 @@
 use futures::StreamExt;
 use redis::{aio::MultiplexedConnection, AsyncCommands};
+use strum::IntoEnumIterator;
 use teloxide::{
     payloads::SendMessageSetters,
     prelude::Requester,
@@ -9,7 +10,7 @@ use teloxide::{
     RequestError
 };
 
-use crate::{subscription::{parse_url, Subscription}, Bot};
+use crate::{subscription::{parse_url, Platform, Subscription}, Bot};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -25,7 +26,9 @@ pub enum Command {
     /// Remove subscription to the live stream from the specified URL\. e\.g\. `/del https://twitter.com/username`
     Del(Subscription),
     /// List existing subscriptions
-    List
+    List,
+    /// List all supported platforms
+    Platform
 }
 
 fn make_reply_markup(action: &str) -> InlineKeyboardMarkup {
@@ -89,6 +92,13 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             } else {
                 bot.send_message(msg.chat.id, "Database error").await?
             }
+        }
+        Command::Platform => {
+            let platforms = Platform::iter().enumerate()
+                .map(|(i, p)| format!("{}\\. {p}", i + 1))
+                .collect::<Vec<String>>()
+                .join("\n");
+            bot.send_message(msg.chat.id, format!("Supported platforms:\n{platforms}")).await?
         }
     };
     respond(())

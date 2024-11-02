@@ -5,8 +5,9 @@ use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use teloxide::utils::command::ParseError;
 use url::Url;
+use strum_macros::{Display, EnumString, EnumIter};
 
-#[derive(Clone, strum_macros::Display, strum_macros::EnumString)]
+#[derive(Clone, Display, EnumString, EnumIter)]
 pub enum Platform {
     #[strum(to_string = "Twitter Space")]
     TwitterSpace
