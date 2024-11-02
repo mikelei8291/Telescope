@@ -56,7 +56,7 @@ async fn send_reply(
 pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: MultiplexedConnection) -> Result<(), RequestError> {
     match cmd {
         Command::Start => bot.send_message(
-            msg.chat.id, "Welcome to the Telescope bot. You can view a list of available commands using the /help command."
+            msg.chat.id, "Welcome to the Telescope bot\\. You can view a list of available commands using the /help command\\."
         ).await?,
         Command::Help => bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?,
         Command::Sub(sub) => {
