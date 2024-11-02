@@ -18,6 +18,7 @@ mod subscription;
 
 #[tokio::main]
 async fn main() -> Result<(), RequestError> {
+    pretty_env_logger::init();
     let bot = teloxide::Bot::from_env().parse_mode(ParseMode::MarkdownV2);
     let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let db = client.get_multiplexed_async_connection().await.unwrap();
