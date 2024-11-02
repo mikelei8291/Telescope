@@ -72,7 +72,10 @@ fn parse_subscription(host: &str, path: &str) -> Result<Subscription, ParseError
     };
 }
 
-pub fn parse_url(input: String) -> Result<(Subscription,), ParseError> {
+pub fn parse_url(mut input: String) -> Result<(Subscription,), ParseError> {
+    if !input.starts_with("http://") || !input.starts_with("https://") {
+        input = format!("https://{input}");
+    }
     match Url::parse(&input) {
         Ok(url) => {
             match url.host() {
