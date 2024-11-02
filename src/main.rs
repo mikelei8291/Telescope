@@ -2,8 +2,10 @@ use handlers::{callback::callback_handler, command::{command_handler, Command}};
 use log::warn;
 use teloxide::{
     adaptors::DefaultParseMode,
-    dispatching::{HandlerExt, MessageFilterExt, UpdateFilterExt},
+    dispatching::UpdateFilterExt,
+    filter_command,
     prelude::{Dispatcher, LoggingErrorHandler, Requester, RequesterExt},
+    respond,
     types::{Message, ParseMode, Update},
     utils::command::BotCommands,
     RequestError
@@ -22,8 +24,11 @@ async fn main() -> Result<(), RequestError> {
     bot.set_my_commands(Command::bot_commands()).await.expect("Loading bot commands failed.");
     let handler = dptree::entry().branch(
         Update::filter_message().branch(
-            Message::filter_text().filter_command::<Command>().endpoint(command_handler)
-        )
+            filter_command::<Command, _>().endpoint(command_handler)
+        ).endpoint(|bot: Bot, msg: Message| async move {
+            bot.send_message(msg.chat.id, "Invalid command").await?;
+            respond(())
+        })
     ).branch(
         Update::filter_callback_query().endpoint(callback_handler)
     );
