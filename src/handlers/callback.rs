@@ -1,8 +1,8 @@
 
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
-use teloxide::{payloads::AnswerCallbackQuerySetters, prelude::Requester, types::CallbackQuery, Bot, RequestError};
+use teloxide::{payloads::AnswerCallbackQuerySetters, prelude::Requester, types::CallbackQuery, RequestError};
 
-use crate::subscription::Subscription;
+use crate::{subscription::Subscription, Bot};
 
 pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: MultiplexedConnection) -> Result<(), RequestError> {
     if let Some(ref data) = query.data {
@@ -29,13 +29,13 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
                     let pipe = pipe
                         .sadd(format!("sub:{sub_str}"), &query.from.id.to_string())
                         .sadd(&query.from.id.to_string(), &sub_str);
-                    (format!("You have successfully subscribed to {} user: {}", sub.platform, sub.user_id), pipe)
+                    (format!("You have successfully subscribed to *{}* user: *{}*", sub.platform, sub.user_id), pipe)
                 }
                 "del" => {
                     let pipe = pipe
                         .srem(format!("sub:{sub_str}"), &query.from.id.to_string())
                         .srem(&query.from.id.to_string(), &sub_str);
-                    (format!("You have successfully unsubscribed to {} user: {}", sub.platform, sub.user_id), pipe)
+                    (format!("You have successfully unsubscribed to *{}* user: *{}*", sub.platform, sub.user_id), pipe)
                 }
                 _ => ("Why are we still here? Just to suffer?".to_owned(), &mut pipe)
             };

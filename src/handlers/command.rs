@@ -1,8 +1,15 @@
 use futures::StreamExt;
 use redis::{aio::MultiplexedConnection, AsyncCommands};
-use teloxide::{prelude::*, types::{InlineKeyboardButton, InlineKeyboardMarkup}, utils::command::BotCommands, RequestError};
+use teloxide::{
+    payloads::SendMessageSetters,
+    prelude::Requester,
+    respond,
+    types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message},
+    utils::command::BotCommands,
+    RequestError
+};
 
-use crate::subscription::{parse_url, Subscription};
+use crate::{subscription::{parse_url, Subscription}, Bot};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -12,10 +19,10 @@ pub enum Command {
     /// Print the help message
     Help,
     #[command(parse_with = parse_url)]
-    /// Subscribe to the live stream from the specified URL
+    /// Subscribe to the live stream from the specified URL\. e\.g\. `/sub https://twitter.com/username`
     Sub(Subscription),
     #[command(parse_with = parse_url)]
-    /// Remove subscription to the live stream from the specified URL
+    /// Remove subscription to the live stream from the specified URL\. e\.g\. `/del https://twitter.com/username`
     Del(Subscription),
     /// List existing subscriptions
     List
@@ -36,7 +43,7 @@ async fn send_reply(
 ) -> Result<Message, RequestError> {
     let reply = bot.send_message(
         chat_id,
-        format!("Please confirm that you want to {text} to {} user: {}", sub.platform, sub.user_id)
+        format!("Please confirm that you want to {text} to *{}* user: *{}*", sub.platform, sub.user_id)
     ).reply_markup(make_reply_markup(action)).await?;
     let key = format!("{}:{}", reply.chat.id, reply.id);
     redis::pipe().atomic().set(&key, sub.to_string()).expire(&key, 86400).exec_async(&mut db).await.unwrap();
@@ -73,7 +80,7 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
         }
         Command::List => {
             if let Ok(results) = db.sscan::<_, String>(msg.chat.id.to_string()).await {
-                let subs = results.enumerate().map(|(i, r)| format!("{}. {r}", i + 1)).collect::<Vec<String>>().await.join("\n");
+                let subs = results.enumerate().map(|(i, r)| format!("{}\\. {r}", i + 1)).collect::<Vec<String>>().await.join("\n");
                 bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
             } else {
                 bot.send_message(msg.chat.id, "Database error").await?
