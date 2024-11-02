@@ -81,7 +81,11 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
         Command::List => {
             if let Ok(results) = db.sscan::<_, String>(msg.chat.id.to_string()).await {
                 let subs = results.enumerate().map(|(i, r)| format!("{}\\. {r}", i + 1)).collect::<Vec<String>>().await.join("\n");
-                bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
+                if subs == "".to_owned() {
+                    bot.send_message(msg.chat.id, "You have no subscriptions").await?
+                } else {
+                    bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
+                }
             } else {
                 bot.send_message(msg.chat.id, "Database error").await?
             }
