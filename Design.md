@@ -5,6 +5,7 @@
 - `/sub <url>`: subscribe to the live stream from the specified URL
 - `/del <url>`: delete the subscription to the live stream of the specified URL
 - `/list`: list all subscriptions of the current user
+- `/platform`: list all supported platforms
 
 ## Workflows
 
