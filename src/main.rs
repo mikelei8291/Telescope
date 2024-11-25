@@ -15,6 +15,7 @@ type Bot = DefaultParseMode<teloxide::Bot>;
 
 mod handlers;
 mod subscription;
+mod apis;
 
 #[tokio::main]
 async fn main() -> Result<(), RequestError> {
