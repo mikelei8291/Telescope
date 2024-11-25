@@ -30,15 +30,19 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
             let (text, pipe) = match data.as_str() {
                 "sub" => {
                     let pipe = pipe
-                        .sadd(format!("sub:{sub_str}"), &query.from.id.to_string())
-                        .sadd(&query.from.id.to_string(), &sub_str);
-                    (format!("You have successfully subscribed to *{}* user: *{}*", sub.platform, sub.user_id), pipe)
+                        .sadd(&sub_str, &query.from.id.to_string())
+                        .sadd(&query.from.id.to_string(), &sub_str)
+                        .sadd("subs", &sub_str);
+                    (format!("You have successfully subscribed to *{}* user: *{}*", sub.platform, sub.user.username), pipe)
                 }
                 "del" => {
-                    let pipe = pipe
-                        .srem(format!("sub:{sub_str}"), &query.from.id.to_string())
+                    let mut pipe = pipe
+                        .srem(&sub_str, &query.from.id.to_string())
                         .srem(&query.from.id.to_string(), &sub_str);
-                    (format!("You have successfully unsubscribed to *{}* user: *{}*", sub.platform, sub.user_id), pipe)
+                    if db.scard::<_, u64>(&sub_str).await.unwrap() == 1 {
+                        pipe = pipe.srem("subs", &sub_str)
+                    }
+                    (format!("You have successfully unsubscribed to *{}* user: *{}*", sub.platform, sub.user.username), pipe)
                 }
                 _ => ("Why are we still here? Just to suffer?".to_owned(), &mut pipe)
             };
