@@ -14,6 +14,7 @@ use teloxide::{
 type Bot = DefaultParseMode<teloxide::Bot>;
 
 mod handlers;
+mod platform;
 mod subscription;
 mod apis;
 
