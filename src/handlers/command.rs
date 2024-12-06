@@ -60,7 +60,7 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             let sub = match Subscription::from_url(sub).await {
                 Ok(sub) => sub,
                 Err(e) => {
-                    bot.send_message(msg.chat.id, e.to_string());
+                    bot.send_message(msg.chat.id, e.to_string()).await?;
                     return respond(());
                 }
             };
@@ -78,7 +78,7 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             let sub = match Subscription::from_url(sub).await {
                 Ok(sub) => sub,
                 Err(e) => {
-                    bot.send_message(msg.chat.id, e.to_string());
+                    bot.send_message(msg.chat.id, e.to_string()).await?;
                     return respond(());
                 }
             };
