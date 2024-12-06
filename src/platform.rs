@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use regex::{Captures, Regex};
 use strum_macros::{Display, EnumIter, EnumString};
 
-use crate::get_twitter_api;
+use crate::apis::get_twitter_api;
 
 #[derive(Clone)]
 pub struct User {
