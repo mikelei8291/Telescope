@@ -5,39 +5,56 @@ use chrono::{DateTime, Utc};
 use reqwest::{cookie::Jar, header::{self, HeaderMap, HeaderValue}, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use teloxide::utils::markdown::{code_block_with_lang, escape, link};
+use teloxide::utils::markdown::{bold, code_block_with_lang, escape, link};
 use url::Url;
+
+use crate::subscription::Subscription;
+
+use super::LiveState;
 
 #[derive(Debug)]
 pub struct API {
     pub client: Client,
     graph_ql_api: Url,
-    fleets_api: Url
+    fleets_api: Url,
+    live_video_stream_api: Url
 }
 
 pub struct TwitterSpace {
     pub id: String,
     pub url: Url,
     pub title: String,
-    pub creator_name: Option<String>,
+    pub creator_name: String,
     pub creator_id: String,
     pub creator_screen_name: String,
-    pub creator_profile_image_url: Option<Url>,
+    pub creator_profile_image_url: Url,
     pub start_time: DateTime<Utc>,
-    pub state: String,
+    pub state: LiveState,
     pub language: String,
     pub available_for_replay: bool,
-    pub media_key: Option<String>
+    pub master_url: Option<Url>
 }
 
 enum Endpoint {
     GraphQL,
-    Fleets
+    Fleets,
+    LiveVideoStream
 }
 
 #[derive(Serialize, Deserialize)]
 struct ProfileSpotlightsQueryVariables {
     screen_name: String
+}
+
+#[derive(Serialize, Deserialize)]
+struct AudioSpaceByIdVariables {
+    id: String,
+    #[serde(rename = "isMetatagsQuery")]
+    is_metatags_query: bool,
+    #[serde(rename = "withReplays")]
+    with_replays: bool,
+    #[serde(rename = "withListeners")]
+    with_listeners: bool
 }
 
 impl API {
@@ -61,18 +78,24 @@ impl API {
         API {
             client,
             graph_ql_api: base_url.join("graphql/").unwrap(),
-            fleets_api: base_url.join("fleets/").unwrap()
+            fleets_api: base_url.join("fleets/").unwrap(),
+            live_video_stream_api: base_url.join("1.1/live_video_stream/").unwrap()
         }
     }
 
     async fn get<T: for<'de> Deserialize<'de>>(
-        &self, endpoint: Endpoint, path: String, params: HashMap<String, String>
+        &self, endpoint: Endpoint, path: String, params: Option<HashMap<String, String>>
     ) -> Option<T> {
         let url = match endpoint {
             Endpoint::GraphQL => self.graph_ql_api.join(path.as_str()).unwrap(),
-            Endpoint::Fleets => self.fleets_api.join(path.as_str()).unwrap()
+            Endpoint::Fleets => self.fleets_api.join(path.as_str()).unwrap(),
+            Endpoint::LiveVideoStream => self.live_video_stream_api.join(path.as_str()).unwrap()
         };
-        let Ok(res) = self.client.get(url).form(&params).send().await else {
+        let mut cb = self.client.get(url.clone());
+        if let Some(params) = params {
+            cb = cb.query(&params);
+        }
+        let Ok(res) = cb.send().await else {
             log::error!("API error");
             return None;
         };
@@ -83,8 +106,24 @@ impl API {
             };
             return Some(data);
         }
-        log::error!("{}: {}", res.status(), res.text().await.unwrap());
+        log::error!("{}: {}: {:?}", url, res.status(), res);
         None
+    }
+
+    async fn audio_space_by_id(&self, space_id: String) -> Option<Value> {
+        let query_id = "xVEzTKg_mLTHubK5ayL0HA";
+        let operation_name = "AudioSpaceById";
+        let variables = AudioSpaceByIdVariables {
+            id: space_id,
+            is_metatags_query: true,
+            with_replays: true,
+            with_listeners: true
+        };
+        let features = "{\"spaces_2022_h2_clipping\":true,\"spaces_2022_h2_spaces_communities\":true,\"responsive_web_graphql_exclude_directive_enabled\":true,\"verified_phone_label_enabled\":false,\"creator_subscriptions_tweet_preview_api_enabled\":true,\"responsive_web_graphql_skip_user_profile_image_extensions_enabled\":false,\"tweetypie_unmention_optimization_enabled\":true,\"responsive_web_edit_tweet_api_enabled\":true,\"graphql_is_translatable_rweb_tweet_is_translatable_enabled\":true,\"view_counts_everywhere_api_enabled\":true,\"longform_notetweets_consumption_enabled\":true,\"responsive_web_twitter_article_tweet_consumption_enabled\":false,\"tweet_awards_web_tipping_enabled\":false,\"freedom_of_speech_not_reach_fetch_enabled\":true,\"standardized_nudges_misinfo\":true,\"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled\":true,\"responsive_web_graphql_timeline_navigation_enabled\":true,\"longform_notetweets_rich_text_read_enabled\":true,\"longform_notetweets_inline_media_enabled\":true,\"responsive_web_media_download_video_enabled\":false,\"responsive_web_enhance_cards_enabled\":false}";
+        let mut params = HashMap::new();
+        params.insert("variables".to_owned(), serde_json::to_string(&variables).unwrap());
+        params.insert("features".to_owned(), features.to_owned());
+        self.get(Endpoint::GraphQL, [query_id, operation_name].join("/"), Some(params)).await
     }
 
     async fn profile_spotlights_query(&self, screen_name: String) -> Option<Value> {
@@ -93,16 +132,20 @@ impl API {
         let variables = ProfileSpotlightsQueryVariables { screen_name };
         let mut params = HashMap::new();
         params.insert("variables".to_owned(), serde_json::to_string(&variables).unwrap());
-        self.get(Endpoint::GraphQL, [query_id, operation_name].join("/"), params).await
+        self.get(Endpoint::GraphQL, [query_id, operation_name].join("/"), Some(params)).await
     }
 
-    async fn avatar_content(&self, user_ids: Vec<String>) -> Option<Value> {
+    async fn avatar_content(&self, user_ids: &[String]) -> Option<Value> {
         let version = "v1";
         let endpoint = "avatar_content";
         let mut params = HashMap::new();
         params.insert("user_ids".to_owned(), user_ids.join(","));
         params.insert("only_spaces".to_owned(), "true".to_owned());
-        self.get(Endpoint::Fleets, [version, endpoint].join("/"), params).await
+        self.get(Endpoint::Fleets, [version, endpoint].join("/"), Some(params)).await
+    }
+
+    async fn status(&self, media_key: &str) -> Option<Value> {
+        self.get(Endpoint::LiveVideoStream, ["status", media_key].join("/"), None).await
     }
 
     pub async fn user_id(&self, screen_name: String) -> Option<String> {
@@ -114,36 +157,56 @@ impl API {
         }
     }
 
-    pub async fn live_status(&self, user_map: HashMap<String, String>) -> HashMap<String, TwitterSpace> {
-        let mut users = HashMap::new();
-        for chunk in user_map.keys().collect::<Vec<&String>>().chunks(100) {
-            let user_ids = chunk.iter().map(|&p| p.to_owned()).collect();
+    pub async fn live_status(&self, space_id: String, language: Option<String>) -> Option<TwitterSpace> {
+        if let Some(space) = self.audio_space_by_id(space_id.clone()).await {
+            let metadata = space["data"]["audioSpace"]["metadata"].as_object().unwrap();
+            let state = metadata["state"].as_str().unwrap().parse().unwrap();
+            let master_url = match state {
+                LiveState::Running => {
+                    if let Some(live_status) = self.status(metadata["media_key"].as_str().unwrap()).await {
+                        Some(live_status["source"]["location"].as_str().unwrap()
+                            .replace("dynamic_playlist.m3u8?type=live", "master_playlist.m3u8").parse().unwrap())
+                    } else {
+                        None
+                    }
+                }
+                LiveState::Ended => None
+            };
+            Some(TwitterSpace {
+                id: space_id.clone(),
+                url: format!("https://twitter.com/i/spaces/{space_id}").parse().unwrap(),
+                title: metadata["title"].as_str().unwrap().to_owned(),
+                creator_name: metadata["creator_results"]["result"]["legacy"]["name"].as_str().unwrap().to_owned(),
+                creator_id: metadata["creator_results"]["result"]["rest_id"].as_str().unwrap().to_owned(),
+                creator_screen_name: metadata["creator_results"]["result"]["legacy"]["screen_name"].as_str().unwrap().to_owned(),
+                creator_profile_image_url: metadata["creator_results"]["result"]["legacy"]["profile_image_url_https"].as_str().unwrap().parse().unwrap(),
+                start_time: DateTime::from_timestamp_millis(metadata["started_at"].as_i64().unwrap()).unwrap(),
+                state,
+                language: language.unwrap_or("und".to_owned()),
+                available_for_replay: metadata["is_space_available_for_replay"].as_bool().unwrap(),
+                master_url
+            })
+        } else {
+            None
+        }
+    }
+
+    pub async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<TwitterSpace> {
+        let mut spaces = vec![];
+        for user_ids in subs.iter().map(|sub| sub.user.user_id.clone()).collect::<Vec<String>>().chunks(100) {
             if let Some(result) = self.avatar_content(user_ids).await {
-                users.extend(
-                    result["users"].as_object().unwrap().iter().map(
-                        |(key, value)| {
-                            let audio_space = &value["spaces"]["live_content"]["audiospace"];
-                            let id = audio_space["broadcast_id"].as_str().unwrap().to_owned();
-                            (key.to_owned(), TwitterSpace {
-                                id: id.clone(),
-                                url: format!("https://twitter.com/i/spaces/{id}").parse().unwrap(),
-                                title: audio_space["title"].as_str().unwrap().to_owned(),
-                                creator_name: None,
-                                creator_id: audio_space["creator_twitter_user_id"].as_u64().unwrap().to_string(),
-                                creator_screen_name: user_map[&id].to_owned(),
-                                creator_profile_image_url: None,
-                                start_time: audio_space["start"].as_str().unwrap().parse().unwrap(),
-                                state: "Running".to_owned(),
-                                language: audio_space["language"].as_str().unwrap().to_owned(),
-                                available_for_replay: audio_space["is_space_available_for_replay"].as_bool().unwrap(),
-                                media_key: None
-                            })
-                        }
-                    )
-                );
+                for value in result["users"].as_object().unwrap().values() {
+                    let audio_space = &value["spaces"]["live_content"]["audiospace"];
+                    if let Some(space) = self.live_status(
+                        audio_space["broadcast_id"].as_str().unwrap().to_owned(),
+                        Some(audio_space["language"].as_str().unwrap().to_owned())
+                    ).await {
+                        spaces.push(space);
+                    }
+                }
             }
         }
-        users
+        spaces
     }
 }
 
