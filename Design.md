@@ -13,8 +13,8 @@
   ```mermaid
   flowchart LR
     subgraph s1["Add subscription"]
-      n1["Add Telegram user ID to the set<br>named with Platform:user_id:username"] --> n2["Add the pair to the set<br>named with the Telegram user ID"]
-      n2 --> n3(["Add the pair to the set 'subs'"])
+      n1["Add pair Platform:user_id:username to the<br>hash 'subs' with empty string as value"] --> n2["Add Telegram user ID to the hash<br>named with the pair and 0 as value"]
+      n2 --> n3(["Add the pair to the set named<br>with the Telegram user ID"])
     end
     A["/sub &lt;url&gt;"] --> B{"Parse URL"}
     B -- Supported Service --> C{"Parse username"}
@@ -30,11 +30,12 @@
   ```mermaid
   flowchart LR
     subgraph s1["Delete subscription"]
-      n1["Remove the pair from the set<br>named with the Telegram user ID"]
-      n1 --> n2{"Does the set<br>Platform:user_id:username<br>only have 1<br>Telegram user ID?"}
-      n2 -- Yes --> n3["Remove the pair from the 'subs' set"]
-      n2 -- No --> n4(["Remove Telegram user ID from the set<br>named with Platform:user_id:username"])
-      n3 --> n4
+      n1["Remove the Platform:user_id:username pair<br>from the set named with the Telegram user ID"]
+      n1 --> n2["Remove the Telegram user ID from<br>the hash named with the pair"]
+      n2 --> n3{"Does the hash<br>Platform:user_id:username<br>used to only have 1<br>Telegram user ID?"}
+      n3 -- Yes --> n4["Remove the pair from the 'subs' hash"]
+      n3 -- No --> n5(["End"])
+      n4 --> n5
     end
     A["/del &lt;url&gt;"] --> B{"Parse URL"}
     B -- Supported Service --> C{"Get username"}
