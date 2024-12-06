@@ -17,6 +17,7 @@ mod handlers;
 mod platform;
 mod subscription;
 mod apis;
+mod watchers;
 
 #[tokio::main]
 async fn main() -> Result<(), RequestError> {
