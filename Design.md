@@ -7,6 +7,12 @@
 - `/list`: list all subscriptions of the current user
 - `/platform`: list all supported platforms
 
+## Database
+
+- subs (HASH): `[platform:user_id:username -> live_id, ...]`
+- platform:user_id:username (HASH): `[Telegram_user_id -> msg_id, ...]`
+- Telegram_user_id (SET): `[platform:user_id_username, ...]`
+
 ## Workflows
 
 - Add subscription
