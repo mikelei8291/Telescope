@@ -212,15 +212,27 @@ impl API {
 
 impl fmt::Display for TwitterSpace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}'s Twitter Space started\n{}\n{}",
-            link(
-                format!("https://twitter.com/{}", self.creator_screen_name).as_str(),
-                format!("@{}", self.creator_screen_name).as_str()
+        match self.state {
+            LiveState::Running => write!(
+                f,
+                "{} \\({}\\)'s Twitter Space started\n{}\n{}",
+                bold(escape(self.creator_name.as_str()).as_str()),
+                link(
+                    format!("https://twitter.com/{}", self.creator_screen_name).as_str(),
+                    format!("@{}", self.creator_screen_name).as_str()
+                ),
+                link(self.url.as_str(), escape(self.title.as_str()).as_str()),
+                code_block_with_lang(format!("twspace_dl -ei {} -f {}", self.url, self.master_url.clone().unwrap()).as_str(), "shell")
             ),
-            link(self.url.as_str(), escape(self.title.as_str()).as_str()),
-            code_block_with_lang(format!("twspace_dl -ei {}", self.url.to_string()).as_str(), "shell")
-        )
+            LiveState::Ended => write!(
+                f,
+                "{} \\({}\\)'s Twitter Space ended\\.",
+                bold(escape(self.creator_name.as_str()).as_str()),
+                link(
+                    format!("https://twitter.com/{}", self.creator_screen_name).as_str(),
+                    format!("@{}", self.creator_screen_name).as_str()
+                )
+            )
+        }
     }
 }
