@@ -65,3 +65,29 @@
     s1 -- Has at least 1 subscription --> C(["fa:fa-message Send subscription list"])
     s1 -- Has no subscription --> D(["fa:fa-message Send no subscription notice and help message"])
   ```
+- Check live streams
+
+  ```mermaid
+  flowchart LR
+    subgraph s1["Check running lives"]
+      n1["Iterate through entries of hash named with platform:user_id:username"]
+      n1 --> n2{"Check live state"}
+      n2 -- Running --> n3(["End"])
+      n2 -- Ended --> n4["fa:fa-message Send live ended<br>message to subscribers"]
+      n4 --> n5["Set live ID of the subs hash and sub string key to empty"]
+      n5 --> n6["Set chat ID of the sub string hash and Telegram user ID key to 0"]
+      n6 --> n3
+    end
+    subgraph s2["Check new lives"]
+      m1["Get live statuses from subscriptions vector"]
+      m1 --> m2["Get keys of the hash named with the sub string as subscribers"]
+      m2 --> m3["Notify subscribers for new live"]
+      m3 --> m4["Set live ID of the subs hash and sub string key"]
+      m4 --> m5(["Set message ID of the sub string hash and Telegram user ID key"])
+    end
+    A["Start"] --> B["Iterate through all entries of the platform from the 'subs' hash"]
+    B --> C{"Has live ID<br>as value?"}
+    C -- Yes --> s1
+    C -- No --> D["Collect subscriptions into vector"]
+    D --> s2
+  ```
