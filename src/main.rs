@@ -10,6 +10,7 @@ use teloxide::{
     utils::command::BotCommands,
     RequestError
 };
+use watchers::watch;
 
 type Bot = DefaultParseMode<teloxide::Bot>;
 
@@ -36,6 +37,7 @@ async fn main() -> Result<(), RequestError> {
     ).branch(
         Update::filter_callback_query().endpoint(callback_handler)
     );
+    let watcher = watch(db.clone(), bot.clone());
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![db])
         .default_handler(|update| async move { warn!("Unhandled update: {update:?}") })
@@ -44,5 +46,6 @@ async fn main() -> Result<(), RequestError> {
         .build()
         .dispatch()
         .await;
+    watcher.await.unwrap();
     Ok(())
 }
