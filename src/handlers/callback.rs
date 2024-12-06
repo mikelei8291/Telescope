@@ -1,6 +1,9 @@
 use log::error;
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
-use teloxide::{payloads::AnswerCallbackQuerySetters, prelude::Requester, types::CallbackQuery, RequestError};
+use teloxide::{
+    payloads::AnswerCallbackQuerySetters, prelude::Requester, types::CallbackQuery, utils::markdown::escape,
+    RequestError,
+};
 
 use crate::{subscription::Subscription, Bot};
 
@@ -26,25 +29,34 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
                 error!("Wrong, too wrong");
                 return Ok(());
             };
-            let mut pipe = redis::pipe().atomic().to_owned();
+            let mut pipe = redis::pipe();
+            let pipe = pipe.atomic();
             let (text, pipe) = match data.as_str() {
                 "sub" => {
                     let pipe = pipe
-                        .sadd(&sub_str, &query.from.id.to_string())
-                        .sadd(&query.from.id.to_string(), &sub_str)
-                        .sadd("subs", &sub_str);
-                    (format!("You have successfully subscribed to *{}* user: *{}*", sub.platform, sub.user.username), pipe)
+                        .hset("subs", &sub_str, "")
+                        .hset(&sub_str, &query.from.id.to_string(), 0)
+                        .sadd(&query.from.id.to_string(), &sub_str);
+                    (format!(
+                        "You have successfully subscribed to *{}* user: *{}*",
+                        sub.platform,
+                        escape(sub.user.username.as_str())
+                    ), pipe)
                 }
                 "del" => {
                     let mut pipe = pipe
-                        .srem(&sub_str, &query.from.id.to_string())
-                        .srem(&query.from.id.to_string(), &sub_str);
-                    if db.scard::<_, u64>(&sub_str).await.unwrap() == 1 {
-                        pipe = pipe.srem("subs", &sub_str)
+                        .srem(&query.from.id.to_string(), &sub_str)
+                        .hdel(&sub_str, &query.from.id.to_string());
+                    if db.hlen::<_, u64>(&sub_str).await.unwrap() == 1 {
+                        pipe = pipe.hdel("subs", &sub_str)
                     }
-                    (format!("You have successfully unsubscribed to *{}* user: *{}*", sub.platform, sub.user.username), pipe)
+                    (format!(
+                        "You have successfully unsubscribed to *{}* user: *{}*",
+                        sub.platform,
+                        escape(sub.user.username.as_str())
+                    ), pipe)
                 }
-                _ => ("Why are we still here? Just to suffer?".to_owned(), &mut pipe)
+                _ => ("Why are we still here? Just to suffer?".to_owned(), pipe)
             };
             pipe.del(key).exec_async(&mut db).await.unwrap();
             bot.edit_message_text(msg.chat.id, msg.id, text).await?;
