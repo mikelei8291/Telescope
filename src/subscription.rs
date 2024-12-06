@@ -1,10 +1,16 @@
 use core::fmt;
 use std::str::FromStr;
 
+use lazy_static::lazy_static;
+use regex::Regex;
 use teloxide::utils::{command::ParseError, markdown::{bold, escape}};
 use url::Url;
 
 use crate::platform::{Platform, User};
+
+lazy_static! {
+    static ref URL_REGEX: Regex = Regex::new(r"^https?://.+$").unwrap();
+}
 
 #[derive(Clone)]
 pub struct Subscription {
@@ -18,6 +24,7 @@ impl fmt::Display for Subscription {
     }
 }
 
+#[derive(Debug)]
 pub enum SubscriptionError {
     UnsupportedPlatform,
     InvalidFormat
@@ -53,7 +60,7 @@ impl Subscription {
     }
 
     pub async fn from_url(mut input: String) -> Result<Self, ParseError> {
-        if !input.starts_with("http://") || !input.starts_with("https://") {
+        if !URL_REGEX.is_match(&input) {
             input = format!("https://{input}");
         }
         match Url::parse(&input) {
