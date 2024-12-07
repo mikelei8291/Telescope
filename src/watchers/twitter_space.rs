@@ -19,7 +19,7 @@ pub async fn check(db: &mut MultiplexedConnection, bot: &Bot) {
             if let Some(live) = api.live_status(live_id, None).await {
                 match live.state {
                     LiveState::Running => (),
-                    LiveState::Ended => {
+                    _ => {
                         let mut db_clone = db.clone();
                         let mut iter: AsyncIter<(String, i32)> = db_clone.hscan(&sub_str).await.unwrap();
                         while let Some((chat_id, msg_id)) = iter.next_item().await {

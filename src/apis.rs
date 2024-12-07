@@ -8,7 +8,8 @@ pub mod twitter;
 #[derive(EnumString)]
 pub enum LiveState {
     Running,
-    Ended
+    Ended,
+    TimedOut
 }
 
 pub static TWITTER_API: OnceCell<Arc<twitter::API>> = OnceCell::const_new();

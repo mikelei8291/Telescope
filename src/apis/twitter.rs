@@ -160,7 +160,7 @@ impl API {
     pub async fn live_status(&self, space_id: String, language: Option<String>) -> Option<TwitterSpace> {
         if let Some(space) = self.audio_space_by_id(space_id.clone()).await {
             let metadata = space["data"]["audioSpace"]["metadata"].as_object().unwrap();
-            let state = metadata["state"].as_str().unwrap().parse().unwrap();
+            let state = metadata["state"].as_str().unwrap().parse().unwrap_or(LiveState::Ended);
             let master_url = match state {
                 LiveState::Running => {
                     if let Some(live_status) = self.status(metadata["media_key"].as_str().unwrap()).await {
@@ -170,7 +170,7 @@ impl API {
                         None
                     }
                 }
-                LiveState::Ended => None
+                _ => None
             };
             Some(TwitterSpace {
                 id: space_id.clone(),
@@ -224,7 +224,7 @@ impl fmt::Display for TwitterSpace {
                 link(self.url.as_str(), escape(self.title.as_str()).as_str()),
                 code_block_with_lang(format!("twspace_dl -ei {} -f {}", self.url, self.master_url.clone().unwrap()).as_str(), "shell")
             ),
-            LiveState::Ended => write!(
+            _ => write!(
                 f,
                 "{} \\({}\\)'s Twitter Space ended",
                 bold(escape(self.creator_name.as_str()).as_str()),
