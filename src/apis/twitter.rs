@@ -14,7 +14,7 @@ use super::LiveState;
 
 #[derive(Debug)]
 pub struct API {
-    pub client: Client,
+    client: Client,
     graph_ql_api: Url,
     fleets_api: Url,
     live_video_stream_api: Url
