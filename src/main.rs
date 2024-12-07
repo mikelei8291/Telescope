@@ -31,7 +31,7 @@ async fn main() -> Result<(), RequestError> {
         Update::filter_message().branch(
             filter_command::<Command, _>().endpoint(command_handler)
         ).endpoint(|bot: Bot, msg: Message| async move {
-            bot.send_message(msg.chat.id, "Invalid command").await?;
+            bot.send_message(msg.chat.id, "Sorry, I don't understand.").await?;
             respond(())
         })
     ).branch(

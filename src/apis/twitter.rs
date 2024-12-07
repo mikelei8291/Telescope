@@ -226,7 +226,7 @@ impl fmt::Display for TwitterSpace {
             ),
             LiveState::Ended => write!(
                 f,
-                "{} \\({}\\)'s Twitter Space ended\\.",
+                "{} \\({}\\)'s Twitter Space ended",
                 bold(escape(self.creator_name.as_str()).as_str()),
                 link(
                     format!("https://twitter.com/{}", self.creator_screen_name).as_str(),

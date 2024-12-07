@@ -43,7 +43,7 @@ async fn send_reply(
 ) -> Result<Message, RequestError> {
     let reply = bot.send_message(
         chat_id,
-        format!("Please confirm that you want to {text} to *{}* user: *{}*", sub.platform, sub.user.username)
+        format!("Please confirm that you want to {text} to *{}* user: *{}*", sub.platform, escape(sub.user.username.as_str()))
     ).reply_markup(make_reply_markup(action)).await?;
     let key = format!("{}:{}", reply.chat.id, reply.id);
     redis::pipe().atomic().set(&key, sub.to_db_string()).expire(&key, 86400).exec_async(&mut db).await.unwrap();
@@ -60,7 +60,7 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             let sub = match Subscription::from_url(sub).await {
                 Ok(sub) => sub,
                 Err(e) => {
-                    bot.send_message(msg.chat.id, e.to_string()).await?;
+                    bot.send_message(msg.chat.id, escape(e.to_string().as_str())).await?;
                     return respond(());
                 }
             };
@@ -78,7 +78,7 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             let sub = match Subscription::from_url(sub).await {
                 Ok(sub) => sub,
                 Err(e) => {
-                    bot.send_message(msg.chat.id, e.to_string()).await?;
+                    bot.send_message(msg.chat.id, escape(e.to_string().as_str())).await?;
                     return respond(());
                 }
             };
