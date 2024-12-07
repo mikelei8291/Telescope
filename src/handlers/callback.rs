@@ -1,5 +1,5 @@
 use log::error;
-use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
+use redis::{aio::MultiplexedConnection, AsyncCommands};
 use teloxide::{
     payloads::AnswerCallbackQuerySetters, prelude::Requester, types::CallbackQuery, utils::markdown::escape,
     RequestError,
@@ -19,7 +19,7 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
             let _: () = db.del(key).await.unwrap();
             return Ok(());
         }
-        let Ok(sub_str): Result<Option<String>, RedisError> = db.get(&key).await else {
+        let Ok(sub_str): Result<Option<String>, _> = db.get(&key).await else {
             bot.answer_callback_query(&query.id).text("Database error").await?;
             return Ok(());
         };
