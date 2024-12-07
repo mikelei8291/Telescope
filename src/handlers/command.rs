@@ -39,15 +39,30 @@ fn make_reply_markup(action: &str) -> InlineKeyboardMarkup {
 }
 
 async fn send_reply(
-    bot: Bot, chat_id: ChatId, sub: Subscription, mut db: MultiplexedConnection, text: &str, action: &str
+    bot: &Bot, chat_id: ChatId, sub: Subscription, db: &mut MultiplexedConnection, text: &str, action: &str
 ) -> Result<Message, RequestError> {
     let reply = bot.send_message(
         chat_id,
         format!("Please confirm that you want to {text} to *{}* user: *{}*", sub.platform, escape(sub.user.username.as_str()))
     ).reply_markup(make_reply_markup(action)).await?;
     let key = format!("{}:{}", reply.chat.id, reply.id);
-    redis::pipe().atomic().set(&key, sub.to_db_string()).expire(&key, 86400).exec_async(&mut db).await.unwrap();
+    redis::pipe().atomic().set(&key, sub.to_db_string()).expire(&key, 86400).exec_async(db).await.unwrap();
     Ok(reply)
+}
+
+async fn parse_urls(bot: &Bot, msg: &Message, urls: String) -> Vec<Subscription> {
+    let mut subs = vec![];
+    let mut errors = vec![];
+    for url in urls.split(" ") {
+        match Subscription::from_url(url.to_owned()).await {
+            Ok(sub) => subs.push(sub),
+            Err(e) => errors.push(format!("{url}: {e}")),
+        }
+    }
+    if errors.len() != 0 {
+        bot.send_message(msg.chat.id, escape(errors.join("\n").as_str())).await.unwrap();
+    }
+    subs
 }
 
 pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: MultiplexedConnection) -> Result<(), RequestError> {
@@ -56,41 +71,33 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             msg.chat.id, "Welcome to the Telescope bot\\. You can view a list of available commands using the /help command\\."
         ).await?,
         Command::Help => bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?,
-        Command::Sub(sub) => {
-            let sub = match Subscription::from_url(sub).await {
-                Ok(sub) => sub,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, escape(e.to_string().as_str())).await?;
-                    return respond(());
-                }
-            };
-            if let Ok(result) = db.sismember(msg.chat.id.to_string(), sub.to_db_string()).await {
-                if result {
-                    bot.send_message(msg.chat.id, "You have already subscribed to the user").await?
+        Command::Sub(urls) => {
+            for sub in parse_urls(&bot, &msg, urls).await {
+                if let Ok(result) = db.sismember(msg.chat.id.to_string(), sub.to_db_string()).await {
+                    if result {
+                        bot.send_message(msg.chat.id, format!("You have already subscribed to {sub}")).await?
+                    } else {
+                        send_reply(&bot, msg.chat.id, sub, &mut db, "subscribe", "sub").await?
+                    }
                 } else {
-                    send_reply(bot, msg.chat.id, sub, db, "subscribe", "sub").await?
-                }
-            } else {
-                bot.send_message(msg.chat.id, "Database error").await?
+                    bot.send_message(msg.chat.id, "Database error").await?
+                };
             }
+            return respond(());
         }
-        Command::Del(sub) => {
-            let sub = match Subscription::from_url(sub).await {
-                Ok(sub) => sub,
-                Err(e) => {
-                    bot.send_message(msg.chat.id, escape(e.to_string().as_str())).await?;
-                    return respond(());
-                }
-            };
-            if let Ok(result) = db.sismember::<_, _, bool>(msg.chat.id.to_string(), sub.to_db_string()).await {
-                if !result {
-                    bot.send_message(msg.chat.id, "You are not subscribed to the user").await?
+        Command::Del(urls) => {
+            for sub in parse_urls(&bot, &msg, urls).await {
+                if let Ok(result) = db.sismember::<_, _, bool>(msg.chat.id.to_string(), sub.to_db_string()).await {
+                    if !result {
+                        bot.send_message(msg.chat.id, format!("You are not subscribed to {sub}")).await?
+                    } else {
+                        send_reply(&bot, msg.chat.id, sub, &mut db, "unsubscribe", "del").await?
+                    }
                 } else {
-                    send_reply(bot, msg.chat.id, sub, db, "unsubscribe", "del").await?
-                }
-            } else {
-                bot.send_message(msg.chat.id, "Database error").await?
+                    bot.send_message(msg.chat.id, "Database error").await?
+                };
             }
+            return respond(());
         }
         Command::List => {
             if let Ok(results) = db.smembers::<_, Vec<String>>(msg.chat.id.to_string()).await {
