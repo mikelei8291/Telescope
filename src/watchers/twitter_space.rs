@@ -43,7 +43,7 @@ pub async fn check(db: &mut MultiplexedConnection, bot: &Bot) {
     for live in api.user_live_status(subs).await {
         let sub = Subscription {
             platform: Platform::TwitterSpace,
-            user: User { user_id: live.creator_id.clone(), username: live.creator_screen_name.clone() }
+            user: User { id: live.creator_id.clone(), username: live.creator_screen_name.clone() }
         };
         let subscribers: Vec<String> = db.hkeys(sub.to_db_string()).await.unwrap();
         for chat_id in subscribers {

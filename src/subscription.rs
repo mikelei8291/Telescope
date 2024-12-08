@@ -35,13 +35,13 @@ impl FromStr for Subscription {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let split: Vec<&str> = s.split(":").collect();
-        let (Some(&platform_str), Some(&user_id), Some(&username)) = (split.get(0), split.get(1), split.get(2)) else {
+        let (Some(&platform_str), Some(&id), Some(&username)) = (split.get(0), split.get(1), split.get(2)) else {
             return Err(SubscriptionError::InvalidFormat);
         };
         let Ok(platform) = Platform::from_str(platform_str) else {
             return Err(SubscriptionError::UnsupportedPlatform);
         };
-        let user = User { user_id: user_id.to_string(), username: username.to_string() };
+        let user = User { id: id.to_owned(), username: username.to_owned() };
         Ok(Subscription { platform, user })
     }
 }
@@ -75,6 +75,6 @@ impl Subscription {
     }
 
     pub fn to_db_string(&self) -> String {
-        format!("{}:{}:{}", self.platform, self.user.user_id, self.user.username)
+        format!("{}:{}:{}", self.platform, self.user.id, self.user.username)
     }
 }

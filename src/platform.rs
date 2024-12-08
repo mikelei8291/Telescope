@@ -6,7 +6,7 @@ use crate::apis::get_twitter_api;
 
 #[derive(Clone)]
 pub struct User {
-    pub user_id: String,
+    pub id: String,
     pub username: String
 }
 
@@ -28,10 +28,10 @@ impl Platform {
                     return None;
                 };
                 let api = get_twitter_api();
-                let Some(user_id) = api.user_id(username.clone()).await else {
+                let Some(id) = api.user_id(username.clone()).await else {
                     return None;
                 };
-                Some(User { user_id, username })
+                Some(User { id, username })
             }
         }
     }

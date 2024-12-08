@@ -193,7 +193,7 @@ impl API {
 
     pub async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<TwitterSpace> {
         let mut spaces = vec![];
-        for user_ids in subs.iter().map(|sub| sub.user.user_id.clone()).collect::<Vec<String>>().chunks(100) {
+        for user_ids in subs.iter().map(|sub| sub.user.id.clone()).collect::<Vec<String>>().chunks(100) {
             if let Some(result) = self.avatar_content(user_ids).await {
                 for value in result["users"].as_object().unwrap().values() {
                     let audio_space = &value["spaces"]["live_content"]["audiospace"];
