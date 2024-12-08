@@ -16,6 +16,7 @@ pub enum LiveState {
 }
 
 pub static TWITTER_API: OnceCell<Arc<twitter::API>> = OnceCell::const_new();
+pub static BILIBILI_API: OnceCell<Arc<bilibili::API>> = OnceCell::const_new();
 
 pub async fn get_twitter_api() -> Arc<twitter::API> {
     TWITTER_API.get_or_init(|| async {
@@ -24,4 +25,8 @@ pub async fn get_twitter_api() -> Arc<twitter::API> {
             &env::var("TWITTER_CSRF_TOKEN").unwrap()
         ))
     }).await.to_owned()
+}
+
+pub async fn get_bilibili_api() -> Arc<bilibili::API> {
+    BILIBILI_API.get_or_init(|| async { Arc::new(bilibili::API::new()) }).await.to_owned()
 }
