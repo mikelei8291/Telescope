@@ -4,6 +4,7 @@ use strum_macros::EnumString;
 use tokio::sync::OnceCell;
 
 pub mod twitter;
+pub mod bilibili;
 
 #[derive(EnumString)]
 pub enum LiveState {
