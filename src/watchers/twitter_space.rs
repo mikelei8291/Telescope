@@ -4,7 +4,7 @@ use teloxide::{payloads::SendMessageSetters, prelude::Requester, types::{LinkPre
 use crate::{apis::{get_twitter_api, LiveState}, platform::{Platform, User}, subscription::Subscription, Bot};
 
 pub async fn check(db: &mut MultiplexedConnection, bot: &Bot) {
-    let api = get_twitter_api();
+    let api = get_twitter_api().await;
     let mut subs: Vec<Subscription> = vec![];
     let mut db_clone = db.clone();
     let mut iter: AsyncIter<(String, String)> = db_clone.hscan_match("subs", "Twitter Space:*").await.unwrap();

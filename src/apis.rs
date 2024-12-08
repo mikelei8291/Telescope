@@ -17,16 +17,11 @@ pub enum LiveState {
 
 pub static TWITTER_API: OnceCell<Arc<twitter::API>> = OnceCell::const_new();
 
-pub fn get_twitter_api() -> Arc<twitter::API> {
-    match TWITTER_API.get() {
-        Some(api) => api.clone(),
-        None => {
-            let api = twitter::API::new(
-                &env::var("TWITTER_AUTH_TOKEN").unwrap(),
-                &env::var("TWITTER_CSRF_TOKEN").unwrap()
-            );
-            TWITTER_API.set(Arc::new(api)).unwrap();
-            TWITTER_API.get().unwrap().clone()
-        }
-    }
+pub async fn get_twitter_api() -> Arc<twitter::API> {
+    TWITTER_API.get_or_init(|| async {
+        Arc::new(twitter::API::new(
+            &env::var("TWITTER_AUTH_TOKEN").unwrap(),
+            &env::var("TWITTER_CSRF_TOKEN").unwrap()
+        ))
+    }).await.to_owned()
 }

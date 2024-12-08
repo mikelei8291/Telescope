@@ -27,7 +27,7 @@ impl Platform {
                 let Some(username) = TWITTER_USERNAME.captures(path).and_then(get_group) else {
                     return None;
                 };
-                let api = get_twitter_api();
+                let api = get_twitter_api().await;
                 let Some(id) = api.user_id(username.clone()).await else {
                     return None;
                 };
