@@ -67,6 +67,14 @@ impl API {
         self.get(path, params).await
     }
 
+    pub async fn username(&self, room_id: String) -> Option<String> {
+        if let Some(result) = self.get_info_by_room(room_id.parse().unwrap()).await {
+            Some(result["data"]["room_info"]["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned())
+        } else {
+            None
+        }
+    }
+
     pub async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<BilibiliLive> {
         let mut lives = vec![];
         for room_id in subs.iter().map(|sub| sub.user.id.parse::<u64>().unwrap()) {
