@@ -5,7 +5,7 @@ use tokio::{task, time};
 
 use crate::Bot;
 
-pub mod twitter_space;
+mod twitter_space;
 
 pub fn watch(mut db: MultiplexedConnection, bot: Bot) -> task::JoinHandle<()> {
     task::spawn(async move {
