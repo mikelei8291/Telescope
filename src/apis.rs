@@ -9,7 +9,9 @@ pub mod twitter;
 pub enum LiveState {
     Running,
     Ended,
-    TimedOut
+    TimedOut,
+    #[strum(default)]
+    Unknown(String)
 }
 
 pub static TWITTER_API: OnceCell<Arc<twitter::API>> = OnceCell::const_new();

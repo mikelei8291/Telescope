@@ -17,11 +17,11 @@ pub async fn check(db: &mut MultiplexedConnection, bot: &Bot) {
             };
         } else {
             if let Some(live) = api.live_status(live_id, None).await {
+                let mut db_clone = db.clone();
+                let mut iter: AsyncIter<(String, i32)> = db_clone.hscan(&sub_str).await.unwrap();
                 match live.state {
                     LiveState::Running => (),
-                    _ => {
-                        let mut db_clone = db.clone();
-                        let mut iter: AsyncIter<(String, i32)> = db_clone.hscan(&sub_str).await.unwrap();
+                    LiveState::Ended | LiveState::TimedOut => {
                         while let Some((chat_id, msg_id)) = iter.next_item().await {
                             bot.send_message(chat_id.clone(), live.to_string()).link_preview_options(LinkPreviewOptions {
                                     is_disabled: true,
@@ -34,6 +34,11 @@ pub async fn check(db: &mut MultiplexedConnection, bot: &Bot) {
                                 .hset("subs", &sub_str, "")
                                 .hset(&sub_str, chat_id, 0)
                                 .exec_async(db).await.unwrap();
+                        }
+                    }
+                    LiveState::Unknown(_) => {
+                        while let Some((chat_id, msg_id)) = iter.next_item().await {
+                            bot.send_message(chat_id, live.to_string()).reply_parameters(ReplyParameters::new(MessageId(msg_id))).await.unwrap();
                         }
                     }
                 }

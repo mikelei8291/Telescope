@@ -212,7 +212,7 @@ impl API {
 
 impl fmt::Display for TwitterSpace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.state {
+        match &self.state {
             LiveState::Running => write!(
                 f,
                 "{} \\({}\\)'s Twitter Space started\n{}\n{}",
@@ -224,7 +224,7 @@ impl fmt::Display for TwitterSpace {
                 link(self.url.as_str(), escape(self.title.as_str()).as_str()),
                 code_block_with_lang(format!("twspace_dl -ei {} -f {}", self.url, self.master_url.clone().unwrap()).as_str(), "shell")
             ),
-            _ => write!(
+            LiveState::Ended | LiveState::TimedOut => write!(
                 f,
                 "{} \\({}\\)'s Twitter Space ended",
                 bold(escape(self.creator_name.as_str()).as_str()),
@@ -232,7 +232,8 @@ impl fmt::Display for TwitterSpace {
                     format!("https://twitter.com/{}", self.creator_screen_name).as_str(),
                     format!("@{}", self.creator_screen_name).as_str()
                 )
-            )
+            ),
+            LiveState::Unknown(state) => f.write_str(escape(format!("Unknown live state: {state}").as_str()).as_str())
         }
     }
 }
