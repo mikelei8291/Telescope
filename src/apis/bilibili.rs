@@ -88,7 +88,7 @@ impl BilibiliAPI {
 
     pub async fn username(&self, room_id: String) -> Option<String> {
         if let Some(result) = self.get_info_by_room(room_id.parse().unwrap()).await {
-            Some(result["data"]["room_info"]["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned())
+            Some(result["data"]["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned())
         } else {
             None
         }
@@ -105,7 +105,7 @@ impl API<BilibiliLive> for BilibiliAPI {
                 id,
                 url: format!("https://live.bilibili.com/{id}").parse().unwrap(),
                 title: info["title"].as_str().unwrap().to_owned(),
-                creator_name: info["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned(),
+                creator_name: result["data"]["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned(),
                 creator_id: info["uid"].as_u64().unwrap(),
                 cover_image_url: info["cover"].as_str().unwrap().parse().unwrap(),
                 start_time: DateTime::from_timestamp(info["live_start_time"].as_i64().unwrap(), 0).unwrap(),
