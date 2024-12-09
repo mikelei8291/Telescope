@@ -223,7 +223,10 @@ impl API<TwitterSpace> for TwitterAPI {
                         &audio_space["broadcast_id"].as_str().unwrap().to_owned(),
                         Some(audio_space["language"].as_str().unwrap().to_owned())
                     ).await {
-                        spaces.push(space);
+                        match space.state {
+                            LiveState::Running => spaces.push(space),
+                            _ => ()
+                        }
                     }
                 }
             }
