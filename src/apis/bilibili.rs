@@ -7,11 +7,11 @@ use serde_json::Value;
 use teloxide::utils::markdown::{bold, escape, link};
 use url::Url;
 
-use crate::subscription::Subscription;
+use crate::{platform::{Platform, User}, subscription::Subscription};
 
-use super::LiveState;
+use super::{LiveState, Metadata, API};
 
-pub struct API {
+pub struct BilibiliAPI {
     client: Client,
     live_api: Url
 }
@@ -27,13 +27,32 @@ pub struct BilibiliLive {
     pub state: LiveState
 }
 
+impl Metadata for BilibiliLive {
+    type Id = u64;
+
+    fn get_id(&self) -> &Self::Id {
+        &self.id
+    }
+
+    fn get_state(&self) -> &LiveState {
+        &self.state
+    }
+
+    fn to_sub(&self) -> Subscription {
+        Subscription {
+            platform: Platform::BilibiliLive,
+            user: User { id: self.id.to_string(), username: self.creator_name.clone() }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct GetInfoByRoomParams {
     room_id: u64
 }
 
-impl API {
-    pub fn new() -> API {
+impl BilibiliAPI {
+    pub fn new() -> Self {
         let live_api: Url = "https://api.live.bilibili.com".parse().unwrap();
         let mut headers = HeaderMap::new();
         headers.append(
@@ -41,7 +60,7 @@ impl API {
             HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
         );
         let client = Client::builder().default_headers(headers).build().unwrap();
-        API { client, live_api }
+        Self { client, live_api }
     }
 
     async fn get<T: Serialize>(&self, path: &str, params: T) -> Option<Value> {
@@ -75,26 +94,37 @@ impl API {
         }
     }
 
-    pub async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<BilibiliLive> {
+}
+
+impl API<BilibiliLive> for BilibiliAPI {
+    async fn live_status(&self, live_id: &String, _language: Option<String>) -> Option<BilibiliLive> {
+        if let Some(result) = self.get_info_by_room(live_id.parse().unwrap()).await {
+            let info = result["data"]["room_info"].as_object().unwrap();
+            let id = info["room_id"].as_u64().unwrap();
+            Some(BilibiliLive {
+                id,
+                url: format!("https://live.bilibili.com/{id}").parse().unwrap(),
+                title: info["title"].as_str().unwrap().to_owned(),
+                creator_name: info["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned(),
+                creator_id: info["uid"].as_u64().unwrap(),
+                cover_image_url: info["cover"].as_str().unwrap().parse().unwrap(),
+                start_time: DateTime::from_timestamp(info["live_start_time"].as_i64().unwrap(), 0).unwrap(),
+                state: match info["live_status"].as_u64().unwrap() {
+                    0 => LiveState::Ended,
+                    1 => LiveState::Running,
+                    status => LiveState::Unknown(status.to_string())
+                }
+            })
+        } else {
+            None
+        }
+    }
+
+    async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<BilibiliLive> {
         let mut lives = vec![];
-        for room_id in subs.iter().map(|sub| sub.user.id.parse::<u64>().unwrap()) {
-            if let Some(result) = self.get_info_by_room(room_id).await {
-                let info = result["data"]["room_info"].as_object().unwrap();
-                let id = info["room_id"].as_u64().unwrap();
-                lives.push(BilibiliLive {
-                    id,
-                    url: format!("https://live.bilibili.com/{id}").parse().unwrap(),
-                    title: info["title"].as_str().unwrap().to_owned(),
-                    creator_name: info["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned(),
-                    creator_id: info["uid"].as_u64().unwrap(),
-                    cover_image_url: info["cover"].as_str().unwrap().parse().unwrap(),
-                    start_time: DateTime::from_timestamp(info["live_start_time"].as_i64().unwrap(), 0).unwrap(),
-                    state: match info["live_status"].as_u64().unwrap() {
-                        0 => LiveState::Ended,
-                        1 => LiveState::Running,
-                        status => LiveState::Unknown(status.to_string())
-                    }
-                });
+        for room_id in subs.iter().map(|sub| &sub.user.id) {
+            if let Some(live) = self.live_status(room_id, None).await {
+                lives.push(live);
             }
         }
         lives

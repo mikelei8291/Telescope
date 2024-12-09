@@ -8,12 +8,12 @@ use serde_json::Value;
 use teloxide::utils::markdown::{bold, code_block_with_lang, escape, link};
 use url::Url;
 
-use crate::subscription::Subscription;
+use crate::{platform::{Platform, User}, subscription::Subscription};
 
-use super::LiveState;
+use super::{LiveState, Metadata, API};
 
 #[derive(Debug)]
-pub struct API {
+pub struct TwitterAPI {
     client: Client,
     graph_ql_api: Url,
     fleets_api: Url,
@@ -33,6 +33,25 @@ pub struct TwitterSpace {
     pub language: String,
     pub available_for_replay: bool,
     pub master_url: Option<Url>
+}
+
+impl Metadata for TwitterSpace {
+    type Id = String;
+
+    fn get_id(&self) -> &Self::Id {
+        &self.id
+    }
+
+    fn get_state(&self) -> &LiveState {
+        &self.state
+    }
+
+    fn to_sub(&self) -> Subscription {
+        Subscription {
+            platform: Platform::TwitterSpace,
+            user: User { id: self.creator_id.clone(), username: self.creator_screen_name.clone() }
+        }
+    }
 }
 
 enum Endpoint {
@@ -57,8 +76,8 @@ struct AudioSpaceByIdVariables {
     with_listeners: bool
 }
 
-impl API {
-    pub fn new(auth_token: &str, csrf_token: &str) -> API {
+impl TwitterAPI {
+    pub fn new(auth_token: &str, csrf_token: &str) -> Self {
         let base_url: Url = "https://x.com/i/api/".parse().unwrap();
         let mut headers = HeaderMap::new();
         headers.append(
@@ -75,7 +94,7 @@ impl API {
             .default_headers(headers)
             .cookie_provider(cookies.into())
             .build().unwrap();
-        API {
+        Self {
             client,
             graph_ql_api: base_url.join("graphql/").unwrap(),
             fleets_api: base_url.join("fleets/").unwrap(),
@@ -157,8 +176,11 @@ impl API {
         }
     }
 
-    pub async fn live_status(&self, space_id: String, language: Option<String>) -> Option<TwitterSpace> {
-        if let Some(space) = self.audio_space_by_id(space_id.clone()).await {
+}
+
+impl API<TwitterSpace> for TwitterAPI {
+    async fn live_status(&self, live_id: &String, language: Option<String>) -> Option<TwitterSpace> {
+        if let Some(space) = self.audio_space_by_id(live_id.clone()).await {
             let metadata = space["data"]["audioSpace"]["metadata"].as_object().unwrap();
             let state = metadata["state"].as_str().unwrap().parse().unwrap_or(LiveState::Ended);
             let master_url = match state {
@@ -173,8 +195,8 @@ impl API {
                 _ => None
             };
             Some(TwitterSpace {
-                id: space_id.clone(),
-                url: format!("https://twitter.com/i/spaces/{space_id}").parse().unwrap(),
+                id: live_id.clone(),
+                url: format!("https://twitter.com/i/spaces/{live_id}").parse().unwrap(),
                 title: metadata["title"].as_str().unwrap().to_owned(),
                 creator_name: metadata["creator_results"]["result"]["legacy"]["name"].as_str().unwrap().to_owned(),
                 creator_id: metadata["creator_results"]["result"]["rest_id"].as_str().unwrap().to_owned(),
@@ -191,14 +213,14 @@ impl API {
         }
     }
 
-    pub async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<TwitterSpace> {
+    async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<TwitterSpace> {
         let mut spaces = vec![];
         for user_ids in subs.iter().map(|sub| sub.user.id.clone()).collect::<Vec<String>>().chunks(100) {
             if let Some(result) = self.avatar_content(user_ids).await {
                 for value in result["users"].as_object().unwrap().values() {
                     let audio_space = &value["spaces"]["live_content"]["audiospace"];
                     if let Some(space) = self.live_status(
-                        audio_space["broadcast_id"].as_str().unwrap().to_owned(),
+                        &audio_space["broadcast_id"].as_str().unwrap().to_owned(),
                         Some(audio_space["language"].as_str().unwrap().to_owned())
                     ).await {
                         spaces.push(space);
