@@ -1,5 +1,4 @@
-use core::fmt;
-use std::{sync::Arc, time::Duration};
+use std::{fmt::Display, sync::Arc, time::Duration};
 
 use redis::{aio::MultiplexedConnection, AsyncCommands, AsyncIter};
 use teloxide::{payloads::SendMessageSetters, prelude::Requester, types::{LinkPreviewOptions, MessageId, ReplyParameters}};
@@ -7,7 +6,7 @@ use tokio::{task, time};
 
 use crate::{apis::{get_bilibili_api, get_twitter_api, LiveState, Metadata, API}, platform::Platform, subscription::Subscription, Bot};
 
-pub async fn check<T: Metadata + fmt::Display>(api: Arc<impl API<T>>, db: &mut MultiplexedConnection, bot: &Bot, platform: Platform) {
+pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut MultiplexedConnection, bot: &Bot, platform: Platform) {
     let mut subs: Vec<Subscription> = vec![];
     let mut db_clone = db.clone();
     let mut iter: AsyncIter<(String, String)> = db_clone.hscan_match("subs", format!("{}:*", platform)).await.unwrap();
