@@ -124,7 +124,10 @@ impl API<BilibiliLive> for BilibiliAPI {
         let mut lives = vec![];
         for room_id in subs.iter().map(|sub| &sub.user.id) {
             if let Some(live) = self.live_status(room_id, None).await {
-                lives.push(live);
+                match live.state {
+                    LiveState::Running => lives.push(live),
+                    _ => ()
+                }
             }
         }
         lives
