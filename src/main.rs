@@ -10,7 +10,7 @@ use teloxide::{
     utils::command::BotCommands,
     RequestError
 };
-use watchers::watch;
+use watcher::watch;
 
 type Bot = DefaultParseMode<teloxide::Bot>;
 
@@ -18,7 +18,7 @@ mod handlers;
 mod platform;
 mod subscription;
 mod apis;
-mod watchers;
+mod watcher;
 
 #[tokio::main]
 async fn main() -> Result<(), RequestError> {
