@@ -1,5 +1,4 @@
-use core::fmt;
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -18,7 +17,7 @@ pub struct Subscription {
     pub user: User
 }
 
-impl fmt::Display for Subscription {
+impl Display for Subscription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.platform, bold(escape(self.user.username.as_str()).as_str()))
     }

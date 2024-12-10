@@ -1,4 +1,4 @@
-use core::fmt;
+use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
 use reqwest::{header::{self, HeaderMap, HeaderValue}, Client};
@@ -127,7 +127,7 @@ impl API<BilibiliLive> for BilibiliAPI {
     }
 }
 
-impl fmt::Display for BilibiliLive {
+impl Display for BilibiliLive {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.state {
             LiveState::Running => write!(

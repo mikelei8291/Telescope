@@ -1,5 +1,4 @@
-use core::fmt;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
 use reqwest::{cookie::Jar, header::{self, HeaderMap, HeaderValue}, Client};
@@ -225,7 +224,7 @@ impl API<TwitterSpace> for TwitterAPI {
     }
 }
 
-impl fmt::Display for TwitterSpace {
+impl Display for TwitterSpace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.state {
             LiveState::Running => write!(
