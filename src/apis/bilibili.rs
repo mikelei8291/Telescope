@@ -87,36 +87,30 @@ impl BilibiliAPI {
     }
 
     pub async fn username(&self, room_id: &String) -> Option<String> {
-        if let Some(result) = self.get_info_by_room(room_id.parse().unwrap()).await {
-            Some(result["data"]["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned())
-        } else {
-            None
-        }
+        let result = self.get_info_by_room(room_id.parse().unwrap()).await?;
+        Some(result["data"]["anchor_info"]["base_info"]["uname"].as_str()?.to_owned())
     }
 }
 
 impl API<BilibiliLive> for BilibiliAPI {
     async fn live_status(&self, live_id: &String, _language: Option<String>) -> Option<BilibiliLive> {
-        if let Some(result) = self.get_info_by_room(live_id.parse().unwrap()).await {
-            let info = result["data"]["room_info"].as_object().unwrap();
-            let id = info["room_id"].as_u64().unwrap();
-            Some(BilibiliLive {
-                id,
-                url: format!("https://live.bilibili.com/{id}").parse().unwrap(),
-                title: info["title"].as_str().unwrap().to_owned(),
-                creator_name: result["data"]["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned(),
-                creator_id: info["uid"].as_u64().unwrap(),
-                cover_image_url: info["cover"].as_str().unwrap().parse().unwrap(),
-                start_time: DateTime::from_timestamp(info["live_start_time"].as_i64().unwrap(), 0).unwrap(),
-                state: match info["live_status"].as_u64().unwrap() {
-                    0 => LiveState::Ended,
-                    1 => LiveState::Running,
-                    status => LiveState::Unknown(status.to_string())
-                }
-            })
-        } else {
-            None
-        }
+        let result = self.get_info_by_room(live_id.parse().unwrap()).await?;
+        let info = result["data"]["room_info"].as_object()?;
+        let id = info["room_id"].as_u64()?;
+        Some(BilibiliLive {
+            id,
+            url: format!("https://live.bilibili.com/{id}").parse().unwrap(),
+            title: info["title"].as_str()?.to_owned(),
+            creator_name: result["data"]["anchor_info"]["base_info"]["uname"].as_str()?.to_owned(),
+            creator_id: info["uid"].as_u64()?,
+            cover_image_url: info["cover"].as_str()?.parse().unwrap(),
+            start_time: DateTime::from_timestamp(info["live_start_time"].as_i64()?, 0)?,
+            state: match info["live_status"].as_u64()? {
+                0 => LiveState::Ended,
+                1 => LiveState::Running,
+                status => LiveState::Unknown(status.to_string())
+            }
+        })
     }
 
     async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<BilibiliLive> {

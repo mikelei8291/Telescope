@@ -168,48 +168,39 @@ impl TwitterAPI {
     }
 
     pub async fn user_id(&self, screen_name: &String) -> Option<String> {
-        if let Some(result) = self.profile_spotlights_query(screen_name.to_owned()).await {
-            let value = &result["data"]["user_result_by_screen_name"]["result"]["rest_id"];
-            Some(value.as_str()?.to_string())
-        } else {
-            None
-        }
+        let result = self.profile_spotlights_query(screen_name.to_owned()).await?;
+        let value = &result["data"]["user_result_by_screen_name"]["result"]["rest_id"];
+        Some(value.as_str()?.to_string())
     }
 }
 
 impl API<TwitterSpace> for TwitterAPI {
     async fn live_status(&self, live_id: &String, language: Option<String>) -> Option<TwitterSpace> {
-        if let Some(space) = self.audio_space_by_id(live_id.clone()).await {
-            let metadata = space["data"]["audioSpace"]["metadata"].as_object().unwrap();
-            let state = metadata["state"].as_str().unwrap().parse().unwrap_or(LiveState::Ended);
-            let master_url = match state {
-                LiveState::Running => {
-                    if let Some(live_status) = self.status(metadata["media_key"].as_str().unwrap()).await {
-                        Some(live_status["source"]["location"].as_str().unwrap()
-                            .replace("dynamic_playlist.m3u8?type=live", "master_playlist.m3u8").parse().unwrap())
-                    } else {
-                        None
-                    }
-                }
-                _ => None
-            };
-            Some(TwitterSpace {
-                id: live_id.clone(),
-                url: format!("https://twitter.com/i/spaces/{live_id}").parse().unwrap(),
-                title: metadata["title"].as_str().unwrap().to_owned(),
-                creator_name: metadata["creator_results"]["result"]["legacy"]["name"].as_str().unwrap().to_owned(),
-                creator_id: metadata["creator_results"]["result"]["rest_id"].as_str().unwrap().to_owned(),
-                creator_screen_name: metadata["creator_results"]["result"]["legacy"]["screen_name"].as_str().unwrap().to_owned(),
-                creator_profile_image_url: metadata["creator_results"]["result"]["legacy"]["profile_image_url_https"].as_str().unwrap().parse().unwrap(),
-                start_time: DateTime::from_timestamp_millis(metadata["started_at"].as_i64().unwrap()).unwrap(),
-                state,
-                language: language.unwrap_or("und".to_owned()),
-                available_for_replay: metadata["is_space_available_for_replay"].as_bool().unwrap(),
-                master_url
-            })
-        } else {
-            None
-        }
+        let space = self.audio_space_by_id(live_id.clone()).await?;
+        let metadata = space["data"]["audioSpace"]["metadata"].as_object()?;
+        let state = metadata["state"].as_str()?.parse().unwrap_or(LiveState::Ended);
+        let master_url = match state {
+            LiveState::Running => {
+                let live_status = self.status(metadata["media_key"].as_str()?).await?;
+                Some(live_status["source"]["location"].as_str()?
+                    .replace("dynamic_playlist.m3u8?type=live", "master_playlist.m3u8").parse().unwrap())
+            }
+            _ => None
+        };
+        Some(TwitterSpace {
+            id: live_id.clone(),
+            url: format!("https://twitter.com/i/spaces/{live_id}").parse().unwrap(),
+            title: metadata["title"].as_str()?.to_owned(),
+            creator_name: metadata["creator_results"]["result"]["legacy"]["name"].as_str()?.to_owned(),
+            creator_id: metadata["creator_results"]["result"]["rest_id"].as_str()?.to_owned(),
+            creator_screen_name: metadata["creator_results"]["result"]["legacy"]["screen_name"].as_str()?.to_owned(),
+            creator_profile_image_url: metadata["creator_results"]["result"]["legacy"]["profile_image_url_https"].as_str()?.parse().unwrap(),
+            start_time: DateTime::from_timestamp_millis(metadata["started_at"].as_i64()?)?,
+            state,
+            language: language.unwrap_or("und".to_owned()),
+            available_for_replay: metadata["is_space_available_for_replay"].as_bool()?,
+            master_url
+        })
     }
 
     async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<TwitterSpace> {
