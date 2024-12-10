@@ -1,22 +1,19 @@
 use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
-use reqwest::{cookie::Jar, header::{self, HeaderMap, HeaderValue}, Client};
+use reqwest::{cookie::Jar, header::{self, HeaderMap, HeaderValue}};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use strum_macros::{Display, EnumString};
 use teloxide::utils::markdown::{bold, code_block_with_lang, escape, link};
 use url::Url;
 
 use crate::{platform::{Platform, User}, subscription::Subscription};
 
-use super::{LiveState, Metadata, API};
+use super::{APIClient, LiveState, Metadata, API};
 
-#[derive(Debug)]
 pub struct TwitterAPI {
-    client: Client,
-    graph_ql_api: Url,
-    fleets_api: Url,
-    live_video_stream_api: Url
+    client: APIClient
 }
 
 pub struct TwitterSpace {
@@ -53,9 +50,13 @@ impl Metadata for TwitterSpace {
     }
 }
 
+#[derive(Display, EnumString)]
 enum Endpoint {
+    #[strum(to_string = "graphql")]
     GraphQL,
+    #[strum(to_string = "fleets")]
     Fleets,
+    #[strum(to_string = "1.1/live_video_stream")]
     LiveVideoStream
 }
 
@@ -89,41 +90,7 @@ impl TwitterAPI {
         let cookies = Jar::default();
         cookies.add_cookie_str(format!("auth_token={auth_token}; Domain={}", base_url.host_str().unwrap()).as_str(), &base_url);
         cookies.add_cookie_str(format!("ct0={csrf_token}; Domain={}", base_url.host_str().unwrap()).as_str(), &base_url);
-        let client = Client::builder()
-            .default_headers(headers)
-            .cookie_provider(cookies.into())
-            .build().unwrap();
-        Self {
-            client,
-            graph_ql_api: base_url.join("graphql/").unwrap(),
-            fleets_api: base_url.join("fleets/").unwrap(),
-            live_video_stream_api: base_url.join("1.1/live_video_stream/").unwrap()
-        }
-    }
-
-    async fn get<T: Serialize>(&self, endpoint: Endpoint, path: String, params: Option<T>) -> Option<Value> {
-        let url = match endpoint {
-            Endpoint::GraphQL => self.graph_ql_api.join(path.as_str()).unwrap(),
-            Endpoint::Fleets => self.fleets_api.join(path.as_str()).unwrap(),
-            Endpoint::LiveVideoStream => self.live_video_stream_api.join(path.as_str()).unwrap()
-        };
-        let mut cb = self.client.get(url.clone());
-        if let Some(params) = params {
-            cb = cb.query(&params);
-        }
-        let Ok(res) = cb.send().await else {
-            log::error!("API error");
-            return None;
-        };
-        if res.status().is_success() {
-            let Ok(data) = res.json::<Value>().await else {
-                log::error!("JSON decode error");
-                return None;
-            };
-            return Some(data);
-        }
-        log::error!("{}: {}: {:?}", url, res.status(), res);
-        None
+        Self { client: APIClient::new(base_url, headers, Some(cookies)) }
     }
 
     async fn audio_space_by_id(&self, space_id: String) -> Option<Value> {
@@ -140,7 +107,7 @@ impl TwitterAPI {
             ("variables", serde_json::to_string(&variables).unwrap()),
             ("features", features.to_owned())
         ]);
-        self.get(Endpoint::GraphQL, [query_id, operation_name].join("/"), Some(params)).await
+        self.client.get(&[&Endpoint::GraphQL.to_string(), query_id, operation_name], Some(params)).await
     }
 
     async fn profile_spotlights_query(&self, screen_name: String) -> Option<Value> {
@@ -150,7 +117,7 @@ impl TwitterAPI {
         let params = HashMap::from([
             ("variables", serde_json::to_string(&variables).unwrap())
         ]);
-        self.get(Endpoint::GraphQL, [query_id, operation_name].join("/"), Some(params)).await
+        self.client.get(&[&Endpoint::GraphQL.to_string(), query_id, operation_name], Some(params)).await
     }
 
     async fn avatar_content(&self, user_ids: &[String]) -> Option<Value> {
@@ -160,11 +127,11 @@ impl TwitterAPI {
             ("user_ids", user_ids.join(",")),
             ("only_spaces", true.to_string())
         ]);
-        self.get(Endpoint::Fleets, [version, endpoint].join("/"), Some(params)).await
+        self.client.get(&[&Endpoint::Fleets.to_string(), version, endpoint], Some(params)).await
     }
 
     async fn status(&self, media_key: &str) -> Option<Value> {
-        self.get::<()>(Endpoint::LiveVideoStream, ["status", media_key].join("/"), None).await
+        self.client.get::<()>(&[&Endpoint::LiveVideoStream.to_string(), "status", media_key], None).await
     }
 
     pub async fn user_id(&self, screen_name: &String) -> Option<String> {

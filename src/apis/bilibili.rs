@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
-use reqwest::{header::{self, HeaderMap, HeaderValue}, Client};
+use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use teloxide::utils::markdown::{bold, escape, link};
@@ -9,11 +9,10 @@ use url::Url;
 
 use crate::{platform::{Platform, User}, subscription::Subscription};
 
-use super::{LiveState, Metadata, API};
+use super::{APIClient, LiveState, Metadata, API};
 
 pub struct BilibiliAPI {
-    client: Client,
-    live_api: Url
+    client: APIClient
 }
 
 pub struct BilibiliLive {
@@ -53,37 +52,18 @@ struct GetInfoByRoomParams {
 
 impl BilibiliAPI {
     pub fn new() -> Self {
-        let live_api: Url = "https://api.live.bilibili.com".parse().unwrap();
         let mut headers = HeaderMap::new();
         headers.append(
             header::USER_AGENT,
             HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
         );
-        let client = Client::builder().default_headers(headers).build().unwrap();
-        Self { client, live_api }
-    }
-
-    async fn get<T: Serialize>(&self, path: &str, params: T) -> Option<Value> {
-        let url = self.live_api.join(path).unwrap();
-        let Ok(res) = self.client.get(url.clone()).query(&params).send().await else {
-            log::error!("API error");
-            return None;
-        };
-        if res.status().is_success() {
-            let Ok(data) = res.json::<Value>().await else {
-                log::error!("JSON decode error");
-                return None;
-            };
-            return Some(data);
-        }
-        log::error!("{}: {}: {:?}", url, res.status(), res);
-        None
+        Self { client: APIClient::new("https://api.live.bilibili.com".parse().unwrap(), headers, None) }
     }
 
     async fn get_info_by_room(&self, room_id: u64) -> Option<Value> {
         let path = "/xlive/web-room/v1/index/getInfoByRoom";
         let params = GetInfoByRoomParams { room_id };
-        self.get(path, params).await
+        self.client.get(&[path], Some(params)).await
     }
 
     pub async fn username(&self, room_id: &String) -> Option<String> {

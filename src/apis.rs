@@ -2,9 +2,13 @@ use std::{env, fmt::Display, sync::Arc};
 
 use bilibili::BilibiliAPI;
 use redis::ToRedisArgs;
+use reqwest::{cookie::Jar, header::HeaderMap, Client};
+use serde::Serialize;
+use serde_json::Value;
 use strum_macros::EnumString;
 use tokio::sync::OnceCell;
 use twitter::TwitterAPI;
+use url::Url;
 
 use crate::subscription::Subscription;
 
@@ -31,6 +35,43 @@ pub trait Metadata {
 pub trait API<T: Metadata + Display> {
     async fn live_status(&self, live_id: &String, language: Option<String>) -> Option<T>;
     async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<T>;
+}
+
+pub struct APIClient {
+    base_url: Url,
+    client: Client
+}
+
+impl APIClient {
+    pub fn new(base_url: Url, headers: HeaderMap, cookies: Option<Jar>) -> Self {
+        let mut cb = Client::builder().default_headers(headers);
+        if let Some(cookies) = cookies {
+            cb = cb.cookie_provider(cookies.into())
+        }
+        let client = cb.build().unwrap();
+        Self { base_url, client }
+    }
+
+    pub async fn get<T: Serialize>(&self, path: &[&str], params: Option<T>) -> Option<Value> {
+        let url = self.base_url.join(&path.join("/")).unwrap();
+        let mut cb = self.client.get(url.clone());
+        if let Some(params) = params {
+            cb = cb.query(&params);
+        }
+        let Ok(res) = cb.send().await else {
+            log::error!("API error");
+            return None;
+        };
+        if res.status().is_success() {
+            let Ok(data) = res.json::<Value>().await else {
+                log::error!("JSON decode error");
+                return None;
+            };
+            return Some(data);
+        }
+        log::error!("{}: {}: {:?}", url, res.status(), res);
+        None
+    }
 }
 
 pub static TWITTER_API: OnceCell<Arc<TwitterAPI>> = OnceCell::const_new();
