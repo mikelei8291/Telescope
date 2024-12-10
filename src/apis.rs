@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::{env, fmt::Display, sync::Arc};
 
 use bilibili::BilibiliAPI;
 use redis::ToRedisArgs;
@@ -28,7 +28,7 @@ pub trait Metadata {
     fn to_sub(&self) -> Subscription;
 }
 
-pub trait API<T> {
+pub trait API<T: Metadata + Display> {
     async fn live_status(&self, live_id: &String, language: Option<String>) -> Option<T>;
     async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<T>;
 }
