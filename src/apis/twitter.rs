@@ -101,9 +101,7 @@ impl TwitterAPI {
         }
     }
 
-    async fn get<T: for<'de> Deserialize<'de>>(
-        &self, endpoint: Endpoint, path: String, params: Option<HashMap<String, String>>
-    ) -> Option<T> {
+    async fn get<T: Serialize>(&self, endpoint: Endpoint, path: String, params: Option<T>) -> Option<Value> {
         let url = match endpoint {
             Endpoint::GraphQL => self.graph_ql_api.join(path.as_str()).unwrap(),
             Endpoint::Fleets => self.fleets_api.join(path.as_str()).unwrap(),
@@ -118,7 +116,7 @@ impl TwitterAPI {
             return None;
         };
         if res.status().is_success() {
-            let Ok(data) = res.json::<T>().await else {
+            let Ok(data) = res.json::<Value>().await else {
                 log::error!("JSON decode error");
                 return None;
             };
@@ -138,9 +136,10 @@ impl TwitterAPI {
             with_listeners: true
         };
         let features = "{\"spaces_2022_h2_clipping\":true,\"spaces_2022_h2_spaces_communities\":true,\"responsive_web_graphql_exclude_directive_enabled\":true,\"verified_phone_label_enabled\":false,\"creator_subscriptions_tweet_preview_api_enabled\":true,\"responsive_web_graphql_skip_user_profile_image_extensions_enabled\":false,\"tweetypie_unmention_optimization_enabled\":true,\"responsive_web_edit_tweet_api_enabled\":true,\"graphql_is_translatable_rweb_tweet_is_translatable_enabled\":true,\"view_counts_everywhere_api_enabled\":true,\"longform_notetweets_consumption_enabled\":true,\"responsive_web_twitter_article_tweet_consumption_enabled\":false,\"tweet_awards_web_tipping_enabled\":false,\"freedom_of_speech_not_reach_fetch_enabled\":true,\"standardized_nudges_misinfo\":true,\"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled\":true,\"responsive_web_graphql_timeline_navigation_enabled\":true,\"longform_notetweets_rich_text_read_enabled\":true,\"longform_notetweets_inline_media_enabled\":true,\"responsive_web_media_download_video_enabled\":false,\"responsive_web_enhance_cards_enabled\":false}";
-        let mut params = HashMap::new();
-        params.insert("variables".to_owned(), serde_json::to_string(&variables).unwrap());
-        params.insert("features".to_owned(), features.to_owned());
+        let params = HashMap::from([
+            ("variables", serde_json::to_string(&variables).unwrap()),
+            ("features", features.to_owned())
+        ]);
         self.get(Endpoint::GraphQL, [query_id, operation_name].join("/"), Some(params)).await
     }
 
@@ -148,22 +147,24 @@ impl TwitterAPI {
         let query_id = "ZQEuHPrIYlvh1NAyIQHP_w";
         let operation_name = "ProfileSpotlightsQuery";
         let variables = ProfileSpotlightsQueryVariables { screen_name };
-        let mut params = HashMap::new();
-        params.insert("variables".to_owned(), serde_json::to_string(&variables).unwrap());
+        let params = HashMap::from([
+            ("variables", serde_json::to_string(&variables).unwrap())
+        ]);
         self.get(Endpoint::GraphQL, [query_id, operation_name].join("/"), Some(params)).await
     }
 
     async fn avatar_content(&self, user_ids: &[String]) -> Option<Value> {
         let version = "v1";
         let endpoint = "avatar_content";
-        let mut params = HashMap::new();
-        params.insert("user_ids".to_owned(), user_ids.join(","));
-        params.insert("only_spaces".to_owned(), "true".to_owned());
+        let params = HashMap::from([
+            ("user_ids", user_ids.join(",")),
+            ("only_spaces", true.to_string())
+        ]);
         self.get(Endpoint::Fleets, [version, endpoint].join("/"), Some(params)).await
     }
 
     async fn status(&self, media_key: &str) -> Option<Value> {
-        self.get(Endpoint::LiveVideoStream, ["status", media_key].join("/"), None).await
+        self.get::<()>(Endpoint::LiveVideoStream, ["status", media_key].join("/"), None).await
     }
 
     pub async fn user_id(&self, screen_name: &String) -> Option<String> {
