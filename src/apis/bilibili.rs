@@ -86,14 +86,13 @@ impl BilibiliAPI {
         self.get(path, params).await
     }
 
-    pub async fn username(&self, room_id: String) -> Option<String> {
+    pub async fn username(&self, room_id: &String) -> Option<String> {
         if let Some(result) = self.get_info_by_room(room_id.parse().unwrap()).await {
             Some(result["data"]["anchor_info"]["base_info"]["uname"].as_str().unwrap().to_owned())
         } else {
             None
         }
     }
-
 }
 
 impl API<BilibiliLive> for BilibiliAPI {

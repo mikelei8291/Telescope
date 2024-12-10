@@ -32,7 +32,7 @@ impl Platform {
                     return None;
                 };
                 let api = get_twitter_api().await;
-                let Some(id) = api.user_id(username.clone()).await else {
+                let Some(id) = api.user_id(&username).await else {
                     return None;
                 };
                 Some(User { id, username })
@@ -44,7 +44,7 @@ impl Platform {
                     return None;
                 };
                 let api = get_bilibili_api().await;
-                let Some(username) = api.username(id.clone()).await else {
+                let Some(username) = api.username(&id).await else {
                     return None;
                 };
                 Some(User { id, username })

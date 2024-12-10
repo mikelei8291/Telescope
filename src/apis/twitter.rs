@@ -167,15 +167,14 @@ impl TwitterAPI {
         self.get(Endpoint::LiveVideoStream, ["status", media_key].join("/"), None).await
     }
 
-    pub async fn user_id(&self, screen_name: String) -> Option<String> {
-        if let Some(result) = self.profile_spotlights_query(screen_name.clone()).await {
+    pub async fn user_id(&self, screen_name: &String) -> Option<String> {
+        if let Some(result) = self.profile_spotlights_query(screen_name.to_owned()).await {
             let value = &result["data"]["user_result_by_screen_name"]["result"]["rest_id"];
             Some(value.as_str()?.to_string())
         } else {
             None
         }
     }
-
 }
 
 impl API<TwitterSpace> for TwitterAPI {
