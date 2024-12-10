@@ -18,9 +18,11 @@ pub enum Command {
     Start,
     /// Print the help message
     Help,
-    /// Subscribe to the live stream from the specified URL\. e\.g\. `/sub https://twitter.com/username`
+    /// Subscribe to the live stream from the specified URL. You can specify multiple URLs by separating them by spaces.
+    /// e.g. /sub https://twitter.com/username
     Sub(String),
-    /// Remove subscription to the live stream from the specified URL\. e\.g\. `/del https://twitter.com/username`
+    /// Remove subscription to the live stream from the specified URL. You can specify multiple URLs by separating them by spaces.
+    /// e.g. /del https://twitter.com/username
     Del(String),
     /// List existing subscriptions
     List,
@@ -70,7 +72,7 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
         Command::Start => bot.send_message(
             msg.chat.id, "Welcome to the Telescope bot\\. You can view a list of available commands using the /help command\\."
         ).await?,
-        Command::Help => bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?,
+        Command::Help => bot.send_message(msg.chat.id, escape(Command::descriptions().to_string().as_str())).await?,
         Command::Sub(urls) => {
             for sub in parse_urls(&bot, &msg, urls).await {
                 if let Ok(result) = db.sismember(msg.chat.id.to_string(), sub.to_db_string()).await {
