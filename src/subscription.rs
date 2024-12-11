@@ -1,7 +1,9 @@
 use std::{fmt::Display, str::FromStr};
 
 use lazy_static::lazy_static;
+use redis::{ErrorKind, FromRedisValue, RedisError, ToRedisArgs};
 use regex::Regex;
+use strum_macros::Display;
 use teloxide::utils::{command::ParseError, markdown::{bold, escape}};
 use url::Url;
 
@@ -23,7 +25,26 @@ impl Display for Subscription {
     }
 }
 
-#[derive(Debug)]
+impl ToRedisArgs for Subscription {
+    fn write_redis_args<W>(&self, out: &mut W)
+        where
+            W: ?Sized + redis::RedisWrite {
+        out.write_arg(self.to_db_string().as_bytes());
+    }
+}
+
+impl FromRedisValue for Subscription {
+    fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
+        String::from_redis_value(v)
+            .map(|s| s.parse().map_err(
+                |e: <Subscription as FromStr>::Err| RedisError::from(
+                    (ErrorKind::TypeError, "Invalid database value", e.to_string())
+                )
+            ))?
+    }
+}
+
+#[derive(Debug, Display)]
 pub enum SubscriptionError {
     UnsupportedPlatform,
     InvalidFormat
