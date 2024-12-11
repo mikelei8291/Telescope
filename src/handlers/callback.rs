@@ -30,7 +30,10 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
             let _: () = db.del(key).await.unwrap();
             return Ok(());
         }
-        let len = db.llen(&key).await.ok().map(|l| NonZero::new(l).unwrap());
+        let len = NonZero::new(db.llen(&key).await.unwrap());
+        if len.is_none() {
+            return error_callback_query(&bot, &query, Some(msg)).await;
+        }
         let Ok(subs) = db.lpop(&key, len).await else {
             return error_callback_query(&bot, &query, Some(msg)).await;
         };
