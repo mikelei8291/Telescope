@@ -87,7 +87,7 @@ impl Subscription {
         if !URL_REGEX.is_match(&input) {
             input = format!("https://{input}");
         }
-        match Url::parse(&input) {
+        match input.parse::<Url>() {
             Ok(url) => {
                 match url.host() {
                     Some(host) => Ok(Self::from_host_and_path(host.to_string().as_str(), url.path()).await?),
