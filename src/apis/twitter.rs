@@ -5,7 +5,7 @@ use reqwest::{cookie::Jar, header::{self, HeaderMap, HeaderValue}};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum_macros::{Display, EnumString};
-use teloxide::utils::markdown::{bold, code_block_with_lang, escape, link};
+use teloxide::{types::InputFile, utils::markdown::{bold, code_block_with_lang, escape, link}};
 use url::Url;
 
 use crate::{platform::{Platform, User}, subscription::Subscription};
@@ -28,7 +28,8 @@ pub struct TwitterSpace {
     pub state: LiveState,
     pub language: String,
     pub available_for_replay: bool,
-    pub master_url: Option<Url>
+    pub master_url: Option<Url>,
+    pub metadata: Value
 }
 
 impl Metadata for TwitterSpace {
@@ -40,6 +41,10 @@ impl Metadata for TwitterSpace {
 
     fn get_state(&self) -> &LiveState {
         &self.state
+    }
+
+    fn get_attachment(&self) -> InputFile {
+        InputFile::memory(self.metadata.to_string()).file_name(format!("{}.json", self.id))
     }
 
     fn to_sub(&self) -> Subscription {
@@ -166,7 +171,8 @@ impl API<TwitterSpace> for TwitterAPI {
             state,
             language: language.unwrap_or("und".to_owned()),
             available_for_replay: metadata["is_space_available_for_replay"].as_bool()?,
-            master_url
+            master_url,
+            metadata: space
         })
     }
 

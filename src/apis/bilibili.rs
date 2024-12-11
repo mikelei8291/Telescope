@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use teloxide::utils::markdown::{bold, escape, link};
+use teloxide::{types::InputFile, utils::markdown::{bold, escape, link}};
 use url::Url;
 
 use crate::{platform::{Platform, User}, subscription::Subscription};
@@ -35,6 +35,10 @@ impl Metadata for BilibiliLive {
 
     fn get_state(&self) -> &LiveState {
         &self.state
+    }
+
+    fn get_attachment(&self) -> InputFile {
+        InputFile::url(self.cover_image_url.clone())
     }
 
     fn to_sub(&self) -> Subscription {

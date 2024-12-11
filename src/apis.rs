@@ -6,6 +6,7 @@ use reqwest::{cookie::Jar, header::HeaderMap, Client};
 use serde::Serialize;
 use serde_json::Value;
 use strum_macros::EnumString;
+use teloxide::types::InputFile;
 use tokio::sync::OnceCell;
 use twitter::TwitterAPI;
 use url::Url;
@@ -29,6 +30,7 @@ pub trait Metadata {
 
     fn get_id(&self) -> &Self::Id;
     fn get_state(&self) -> &LiveState;
+    fn get_attachment(&self) -> InputFile;
     fn to_sub(&self) -> Subscription;
 }
 
