@@ -48,8 +48,8 @@ fn make_reply_markup(action: Action) -> InlineKeyboardMarkup {
 }
 
 async fn send_reply(
-    bot: &Bot, chat_id: ChatId, db: &mut MultiplexedConnection, subs: Vec<Subscription>, action: Action
-) -> Result<Message, RequestError> {
+    bot: &Bot, chat_id: ChatId, db: &mut MultiplexedConnection, subs: &Vec<Subscription>, action: Action
+) -> Result<(), RequestError> {
     let subs_list = fmt_subscriptions(&subs);
     let reply = bot.send_message(
         chat_id,
@@ -57,12 +57,12 @@ async fn send_reply(
     ).reply_markup(make_reply_markup(action)).await?;
     let key = format!("{}:{}", reply.chat.id, reply.id);
     redis::pipe().atomic().rpush(&key, subs).expire(&key, 86400).exec_async(db).await.unwrap();
-    Ok(reply)
+    Ok(())
 }
 
 async fn process_urls(
     bot: &Bot, msg: &Message, db: &mut MultiplexedConnection, urls: &String, action: Action
-) -> Result<Message, RequestError> {
+) -> Result<(), RequestError> {
     let mut subs = vec![];
     let mut errors = vec![];
     for url in urls.split(" ").filter(|url| !url.trim().is_empty()) {
@@ -85,10 +85,16 @@ async fn process_urls(
             Err(e) => errors.push(format!("{url}: {e}")),
         }
     }
-    if errors.len() != 0 {
-        bot.send_message(msg.chat.id, errors.join("\n")).await.unwrap();
+    if errors.len() > 0 {
+        bot.send_message(msg.chat.id, errors.join("\n")).await?;
     }
-    send_reply(bot, msg.chat.id, db, subs, action).await
+    if subs.len() > 0 {
+        send_reply(bot, msg.chat.id, db, &subs, action).await?;
+    }
+    if errors.len() == 0 && subs.len() == 0 {
+        bot.send_message(msg.chat.id, "Nothing to do").await?;
+    }
+    Ok(())
 }
 
 pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: MultiplexedConnection) -> Result<(), RequestError> {
@@ -97,8 +103,8 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             msg.chat.id, "Welcome to the Telescope bot\\. You can view a list of available commands using the /help command\\."
         ).await?,
         Command::Help => bot.send_message(msg.chat.id, escape(Command::descriptions().to_string().as_str())).await?,
-        Command::Sub(ref urls) => process_urls(&bot, &msg, &mut db, urls, Action::Subscribe).await?,
-        Command::Del(ref urls) => process_urls(&bot, &msg, &mut db, urls, Action::Unsubscribe).await?,
+        Command::Sub(ref urls) => return process_urls(&bot, &msg, &mut db, urls, Action::Subscribe).await,
+        Command::Del(ref urls) => return process_urls(&bot, &msg, &mut db, urls, Action::Unsubscribe).await,
         Command::List => {
             if let Ok(results) = db.smembers::<_, Vec<String>>(msg.chat.id.to_string()).await {
                 let subs = results.iter().enumerate().filter_map(|(i, r)| {
