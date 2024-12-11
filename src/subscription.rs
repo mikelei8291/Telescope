@@ -25,6 +25,10 @@ impl Display for Subscription {
     }
 }
 
+pub fn fmt_subscriptions(subs: &Vec<Subscription>) -> String {
+    subs.iter().enumerate().map(|(i, s)| format!("{}\\. {s}", i + 1)).collect::<Vec<_>>().join("\n")
+}
+
 impl ToRedisArgs for Subscription {
     fn write_redis_args<W>(&self, out: &mut W)
         where
