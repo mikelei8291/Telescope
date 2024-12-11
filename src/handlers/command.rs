@@ -65,8 +65,8 @@ async fn process_urls(
 ) -> Result<Message, RequestError> {
     let mut subs = vec![];
     let mut errors = vec![];
-    for url in urls.split(" ") {
-        match Subscription::from_url(url.to_owned()).await {
+    for url in urls.split(" ").filter(|url| !url.trim().is_empty()) {
+        match Subscription::from_url(url.trim().to_owned()).await {
             Ok(sub) => {
                 if let Ok(result) = db.sismember(msg.chat.id.to_string(), &sub).await {
                     if result {
