@@ -82,7 +82,7 @@ async fn process_urls(
                     }
                 }
             },
-            Err(e) => errors.push(format!("{url}: {e}")),
+            Err(e) => errors.push(format!("{}: {e}", escape(url))),
         }
     }
     if errors.len() > 0 {
