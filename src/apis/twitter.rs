@@ -16,6 +16,7 @@ pub struct TwitterAPI {
     client: APIClient
 }
 
+#[allow(dead_code)]
 pub struct TwitterSpace {
     pub id: String,
     pub url: Url,

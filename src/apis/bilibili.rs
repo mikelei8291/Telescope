@@ -15,6 +15,7 @@ pub struct BilibiliAPI {
     client: APIClient
 }
 
+#[allow(dead_code)]
 pub struct BilibiliLive {
     pub id: u64,
     pub url: Url,
