@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
+use futures::{stream, StreamExt};
 use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -99,16 +100,9 @@ impl API<BilibiliLive> for BilibiliAPI {
     }
 
     async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<BilibiliLive> {
-        let mut lives = vec![];
-        for room_id in subs.iter().map(|sub| &sub.user.id) {
-            if let Some(live) = self.live_status(room_id, None).await {
-                match live.state {
-                    LiveState::Running => lives.push(live),
-                    _ => ()
-                }
-            }
-        }
-        lives
+        stream::iter(subs).filter_map(
+            async |sub| self.live_status(&sub.user.id, None).await.filter(|live| matches!(live.state, LiveState::Running))
+        ).collect().await
     }
 }
 

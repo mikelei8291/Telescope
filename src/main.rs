@@ -1,3 +1,5 @@
+#![feature(async_closure)]
+
 use handlers::{callback::callback_handler, command::{command_handler, Command}};
 use log::warn;
 use teloxide::{

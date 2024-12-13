@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
+use futures::{stream::{self}, StreamExt};
 use reqwest::{cookie::Jar, header::{self, HeaderMap, HeaderValue}};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -181,18 +182,13 @@ impl API<TwitterSpace> for TwitterAPI {
         let mut spaces = vec![];
         for user_ids in subs.iter().map(|sub| sub.user.id.clone()).collect::<Vec<String>>().chunks(100) {
             if let Some(result) = self.avatar_content(user_ids).await {
-                for value in result["users"].as_object().unwrap().values() {
+                spaces.extend(stream::iter(result["users"].as_object().unwrap().values()).filter_map(async |value| {
                     let audio_space = &value["spaces"]["live_content"]["audiospace"];
-                    if let Some(space) = self.live_status(
+                    self.live_status(
                         &audio_space["broadcast_id"].as_str().unwrap().to_owned(),
                         Some(audio_space["language"].as_str().unwrap().to_owned())
-                    ).await {
-                        match space.state {
-                            LiveState::Running => spaces.push(space),
-                            _ => ()
-                        }
-                    }
-                }
+                    ).await.filter(|space| matches!(space.state, LiveState::Running))
+                }).collect::<Vec<_>>().await);
             }
         }
         spaces
