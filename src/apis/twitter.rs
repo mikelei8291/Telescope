@@ -203,8 +203,8 @@ impl Display for TwitterSpace {
                 "{} \\({}\\)'s Twitter Space started\n{}\n{}",
                 bold(escape(self.creator_name.as_str()).as_str()),
                 link(
-                    format!("https://twitter.com/{}", self.creator_screen_name).as_str(),
-                    format!("@{}", self.creator_screen_name).as_str()
+                    format!("https://twitter.com/{}", escape(self.creator_screen_name.as_str())).as_str(),
+                    format!("@{}", escape(self.creator_screen_name.as_str())).as_str()
                 ),
                 link(self.url.as_str(), escape(self.title.as_str()).as_str()),
                 code_block_with_lang(format!("twspace_dl -ei {} -f {}", self.url, self.master_url.clone().unwrap()).as_str(), "shell")
@@ -214,8 +214,8 @@ impl Display for TwitterSpace {
                 "{} \\({}\\)'s Twitter Space ended",
                 bold(escape(self.creator_name.as_str()).as_str()),
                 link(
-                    format!("https://twitter.com/{}", self.creator_screen_name).as_str(),
-                    format!("@{}", self.creator_screen_name).as_str()
+                    format!("https://twitter.com/{}", escape(self.creator_screen_name.as_str())).as_str(),
+                    format!("@{}", escape(self.creator_screen_name.as_str())).as_str()
                 )
             ),
             LiveState::Unknown(state) => f.write_str(escape(format!("Unknown live state: {state}").as_str()).as_str())
