@@ -1,5 +1,3 @@
-#![feature(async_closure)]
-
 use std::{env, panic, process::exit};
 
 use handlers::{callback::callback_handler, command::{command_handler, Command}};
