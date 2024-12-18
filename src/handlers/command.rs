@@ -67,7 +67,7 @@ async fn process_urls(
     let mut errors = vec![];
     for url in urls.split(" ").filter_map(|url| {
         let url = url.trim();
-        url.is_empty().then_some(url)
+        (!url.is_empty()).then_some(url)
     }) {
         match Subscription::from_url(url.to_owned()).await {
             Ok(sub) => {
