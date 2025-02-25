@@ -183,10 +183,10 @@ impl API<TwitterSpace> for TwitterAPI {
         for user_ids in subs.iter().map(|sub| sub.user.id.clone()).collect::<Vec<String>>().chunks(100) {
             if let Some(result) = self.avatar_content(user_ids).await {
                 spaces.extend(stream::iter(result["users"].as_object().unwrap().values()).filter_map(async |value| {
-                    let audio_space = &value["spaces"]["live_content"]["audiospace"];
+                    let audio_space = &value["spaces"]["live_content"]["audiospace"].as_object()?;
                     self.live_status(
-                        &audio_space["broadcast_id"].as_str().unwrap().to_owned(),
-                        Some(audio_space["language"].as_str().unwrap().to_owned())
+                        &audio_space.get("broadcast_id")?.as_str()?.to_owned(),
+                        Some(audio_space.get("language")?.as_str()?.to_owned())
                     ).await.filter(|space| matches!(space.state, LiveState::Running))
                 }).collect::<Vec<_>>().await);
             }
