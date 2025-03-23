@@ -31,7 +31,9 @@ pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut Multip
                     LiveState::Running => (),
                     LiveState::Ended | LiveState::TimedOut => {
                         while let Some((chat_id, msg_id)) = iter.next_item().await {
-                            bot.send_message(chat_id.clone(), live.to_string())
+                            let msg = live.to_string();
+                            log::info!("Sending message: {msg}");
+                            bot.send_message(chat_id.clone(), msg)
                                 .disable_link_preview(true).reply_to(MessageId(msg_id)).await.unwrap();
                             redis::pipe().atomic()
                                 .hset("subs", &sub, "")
@@ -41,7 +43,9 @@ pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut Multip
                     }
                     LiveState::Unknown(_) => {
                         while let Some((chat_id, msg_id)) = iter.next_item().await {
-                            bot.send_message(chat_id, live.to_string()).reply_to(MessageId(msg_id)).await.unwrap();
+                            let msg = live.to_string();
+                            log::info!("Sending message: {msg}");
+                            bot.send_message(chat_id, msg).reply_to(MessageId(msg_id)).await.unwrap();
                         }
                     }
                 }
@@ -52,11 +56,13 @@ pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut Multip
         let sub = live.to_sub();
         let subscribers: Vec<String> = db.hkeys(&sub).await.unwrap();
         for chat_id in subscribers {
+            let msg_text = live.to_string();
+            log::info!("Sending message: {msg_text}");
             let msg = match platform {
                 Platform::TwitterSpace => bot.send_document(chat_id.clone(), live.get_attachment())
-                    .caption(live.to_string()).await.unwrap(),
+                    .caption(msg_text).await.unwrap(),
                 Platform::BilibiliLive => bot.send_photo(chat_id.clone(), live.get_attachment())
-                    .caption(live.to_string()).await.unwrap()
+                    .caption(msg_text).await.unwrap()
             };
             redis::pipe().atomic()
                 .hset("subs", &sub, live.get_id())
