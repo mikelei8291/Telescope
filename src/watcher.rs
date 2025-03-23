@@ -2,9 +2,10 @@ use std::{fmt::Display, sync::Arc, time::Duration};
 
 use redis::{aio::MultiplexedConnection, AsyncCommands, AsyncIter};
 use teloxide::{
-    payloads::{SendDocumentSetters, SendMessageSetters, SendPhotoSetters},
+    payloads::{SendDocumentSetters, SendPhotoSetters},
     prelude::Requester,
-    types::{LinkPreviewOptions, MessageId, ReplyParameters},
+    sugar::request::{RequestLinkPreviewExt, RequestReplyExt},
+    types::MessageId
 };
 use tokio::{task, time};
 
@@ -12,7 +13,7 @@ use crate::{
     apis::{get_bilibili_api, get_twitter_api, LiveState, Metadata, API},
     platform::Platform,
     subscription::Subscription,
-    Bot,
+    Bot
 };
 
 pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut MultiplexedConnection, bot: &Bot, platform: Platform) {
@@ -30,13 +31,8 @@ pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut Multip
                     LiveState::Running => (),
                     LiveState::Ended | LiveState::TimedOut => {
                         while let Some((chat_id, msg_id)) = iter.next_item().await {
-                            bot.send_message(chat_id.clone(), live.to_string()).link_preview_options(LinkPreviewOptions {
-                                    is_disabled: true,
-                                    url: Default::default(),
-                                    prefer_small_media: Default::default(),
-                                    prefer_large_media: Default::default(),
-                                    show_above_text: Default::default()
-                                }).reply_parameters(ReplyParameters::new(MessageId(msg_id))).await.unwrap();
+                            bot.send_message(chat_id.clone(), live.to_string())
+                                .disable_link_preview(true).reply_to(MessageId(msg_id)).await.unwrap();
                             redis::pipe().atomic()
                                 .hset("subs", &sub, "")
                                 .hset(&sub, chat_id, 0)
@@ -45,7 +41,7 @@ pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut Multip
                     }
                     LiveState::Unknown(_) => {
                         while let Some((chat_id, msg_id)) = iter.next_item().await {
-                            bot.send_message(chat_id, live.to_string()).reply_parameters(ReplyParameters::new(MessageId(msg_id))).await.unwrap();
+                            bot.send_message(chat_id, live.to_string()).reply_to(MessageId(msg_id)).await.unwrap();
                         }
                     }
                 }
