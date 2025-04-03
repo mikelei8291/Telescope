@@ -4,12 +4,17 @@ use strum_macros::{Display, EnumString};
 use teloxide::{
     payloads::SendMessageSetters,
     prelude::Requester,
+    sugar::request::RequestLinkPreviewExt,
     types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup, Message},
     utils::{command::BotCommands, markdown::escape},
     RequestError
 };
 
-use crate::{platform::Platform, subscription::{fmt_subscriptions, Subscription}, Bot};
+use crate::{
+    platform::Platform,
+    subscription::{fmt_subscriptions, Subscription},
+    Bot
+};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -85,11 +90,11 @@ async fn process_urls(
                     }
                 }
             },
-            Err(e) => errors.push(format!("{}: {e}", escape(url))),
+            Err(e) => errors.push(format!("{}: {}", escape(url), escape(e.to_string().as_str()))),
         }
     }
     if errors.len() > 0 {
-        bot.send_message(msg.chat.id, errors.join("\n")).await?;
+        bot.send_message(msg.chat.id, errors.join("\n")).disable_link_preview(true).await?;
     }
     if subs.len() > 0 {
         send_reply(bot, msg.chat.id, db, &subs, action).await?;
