@@ -69,7 +69,12 @@ impl BilibiliAPI {
     async fn get_info_by_room(&self, room_id: u64) -> Option<Value> {
         let path = "/xlive/web-room/v1/index/getInfoByRoom";
         let params = GetInfoByRoomParams { room_id };
-        self.client.get(&[path], Some(params)).await
+        let result = self.client.get(&[path], Some(params)).await?;
+        if result["code"].as_i64()? != 0 {
+            log::error!("Bilibili API error: {}", result["code"]);
+            return None;
+        }
+        Some(result)
     }
 
     pub async fn username(&self, room_id: &String) -> Option<String> {
