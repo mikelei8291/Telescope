@@ -19,7 +19,9 @@ use crate::{
 pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut MultiplexedConnection, bot: &Bot, platform: Platform) {
     let mut subs: Vec<Subscription> = vec![];
     let mut db_clone = db.clone();
-    let mut iter: AsyncIter<(Subscription, String)> = db_clone.hscan_match("subs", format!("{platform}:*")).await.unwrap();
+    let Ok(mut iter): Result<AsyncIter<(Subscription, String)>, _> = db_clone.hscan_match("subs", format!("{platform}:*")).await else {
+        return;
+    };
     while let Some((sub, live_id)) = iter.next_item().await {
         if live_id.is_empty() {
             subs.push(sub);
