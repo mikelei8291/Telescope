@@ -56,11 +56,11 @@ impl APIClient {
 
     pub async fn get<T: Serialize>(&self, path: &[&str], params: Option<T>) -> Option<Value> {
         let url = self.base_url.join(&path.join("/")).unwrap();
-        let mut cb = self.client.get(url.clone());
+        let mut req = self.client.get(url.clone());
         if let Some(params) = params {
-            cb = cb.query(&params);
+            req = req.query(&params);
         }
-        let Ok(res) = cb.send().await else {
+        let Ok(res) = req.send().await else {
             log::error!("API error");
             return None;
         };
