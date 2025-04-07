@@ -1,16 +1,89 @@
-use std::fmt::Display;
+use std::{collections::BTreeMap, fmt::Display, sync::Arc};
 
-use chrono::{DateTime, Utc};
+use base16ct::lower::encode_string;
+use chrono::{DateTime, Duration, Utc};
 use futures::{stream, StreamExt};
+use lazy_regex::{lazy_regex, Lazy};
+use md5::{Digest, Md5};
+use regex::Regex;
 use reqwest::header::{self, HeaderMap, HeaderValue};
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use teloxide::{types::InputFile, utils::markdown::{bold, escape, link}};
+use teloxide::{
+    types::InputFile,
+    utils::markdown::{bold, escape, link}
+};
+use tokio::sync::{Mutex, OnceCell};
 use url::Url;
 
-use crate::{platform::{Platform, User}, subscription::Subscription};
-
 use super::{APIClient, LiveState, Metadata, API};
+use crate::{
+    platform::{Platform, User},
+    subscription::Subscription
+};
+
+struct Wbi {
+    client: APIClient,
+    update_time: DateTime<Utc>,
+    key: Option<String>
+}
+
+impl Wbi {
+    const WBI_REGEX: Lazy<Regex> = lazy_regex!(r"\/wbi\/(.+)\.png");
+    const KEY_MAP: [usize; 64] = [
+        46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
+        27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13,
+        37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4,
+        22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52
+    ];
+    const KEY_LENGTH: usize = 32;
+
+    fn new() -> Self {
+        let headers = HeaderMap::from_iter([
+            (header::USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"))
+        ]);
+        Self {
+            client: APIClient::new("https://api.bilibili.com/x/web-interface/nav".parse().unwrap(), headers, None),
+            update_time: Utc::now(),
+            key: None
+        }
+    }
+
+    async fn update_key(&mut self) -> Option<()> {
+        if self.key.is_none() || self.update_time + Duration::hours(2) > Utc::now() {
+            let data = self.client.get::<()>(&[], None).await?;
+            let img_url = data["data"]["wbi_img"]["img_url"].as_str()?;
+            let sub_url = data["data"]["wbi_img"]["sub_url"].as_str()?;
+            let img = &Wbi::WBI_REGEX.captures(img_url)?[1];
+            let sub = &Wbi::WBI_REGEX.captures(sub_url)?[1];
+            let full = img.to_owned() + sub;
+            let full = full.as_bytes();
+            let mut key = [0u8; Wbi::KEY_LENGTH];
+            for i in 0..Wbi::KEY_LENGTH {
+                key[i] = full[Wbi::KEY_MAP[i]];
+            }
+            self.key = Some(str::from_utf8(&key).ok()?.to_owned());
+            self.update_time = Utc::now();
+        }
+        Some(())
+    }
+
+    async fn sign(&mut self, data: &mut BTreeMap<&str, String>) -> Option<()> {
+        self.update_key().await?;
+        let key = self.key.clone()?;
+        let wts = Utc::now().timestamp();
+        data.insert("wts", wts.to_string());
+        let param = serde_urlencoded::to_string(&*data).ok()?;
+        let hash = encode_string(&Md5::digest(param + &key));
+        data.insert("w_rid", hash);
+        Some(())
+    }
+}
+
+static WBI: OnceCell<Arc<Mutex<Wbi>>> = OnceCell::const_new();
+
+async fn get_wbi() -> Arc<Mutex<Wbi>> {
+    WBI.get_or_init(|| async { Arc::new(Mutex::new(Wbi::new())) }).await.to_owned()
+}
 
 pub struct BilibiliAPI {
     client: APIClient
@@ -51,24 +124,23 @@ impl Metadata for BilibiliLive {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct GetInfoByRoomParams {
-    room_id: u64
-}
-
 impl BilibiliAPI {
     pub fn new() -> Self {
         let mut headers = HeaderMap::new();
         headers.append(
             header::USER_AGENT,
-            HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+            HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0")
         );
         Self { client: APIClient::new("https://api.live.bilibili.com".parse().unwrap(), headers, None) }
     }
 
     async fn get_info_by_room(&self, room_id: u64) -> Option<Value> {
         let path = "/xlive/web-room/v1/index/getInfoByRoom";
-        let params = GetInfoByRoomParams { room_id };
+        let mut params = BTreeMap::from([
+            ("room_id", room_id.to_string())
+        ]);
+        let wbi = get_wbi().await;
+        wbi.lock().await.sign(&mut params).await?;
         let result = self.client.get(&[path], Some(params)).await?;
         if result["code"].as_i64()? != 0 {
             log::error!("Bilibili API error: {}", result["code"]);
