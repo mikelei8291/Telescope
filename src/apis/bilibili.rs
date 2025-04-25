@@ -49,7 +49,7 @@ impl Wbi {
     }
 
     async fn update_key(&mut self) -> Option<()> {
-        if self.key.is_none() || self.update_time + Duration::hours(2) > Utc::now() {
+        if self.key.is_none() || self.update_time + Duration::hours(2) <= Utc::now() {
             let data = self.client.get::<()>(&[], None).await?;
             let img_url = data["data"]["wbi_img"]["img_url"].as_str()?;
             let sub_url = data["data"]["wbi_img"]["sub_url"].as_str()?;
