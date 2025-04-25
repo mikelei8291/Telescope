@@ -166,7 +166,7 @@ impl API<BilibiliLive> for BilibiliAPI {
             title: info["title"].as_str()?.to_owned(),
             creator_name: result["data"]["anchor_info"]["base_info"]["uname"].as_str()?.to_owned(),
             creator_id: info["uid"].as_u64()?,
-            cover_image_url: info["cover"].as_str()?.parse().unwrap(),
+            cover_image_url: info["cover"].as_str()?.parse().ok()?,
             start_time: DateTime::from_timestamp(info["live_start_time"].as_i64()?, 0)?,
             state: match info["live_status"].as_u64()? {
                 0 => LiveState::Ended,
