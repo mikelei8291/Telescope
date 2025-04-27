@@ -150,19 +150,19 @@ impl BilibiliAPI {
     }
 
     pub async fn username(&self, room_id: &String) -> Option<String> {
-        let result = self.get_info_by_room(room_id.parse().unwrap()).await?;
+        let result = self.get_info_by_room(room_id.parse().ok()?).await?;
         Some(result["data"]["anchor_info"]["base_info"]["uname"].as_str()?.to_owned())
     }
 }
 
 impl API<BilibiliLive> for BilibiliAPI {
     async fn live_status(&self, live_id: &String, _language: Option<String>) -> Option<BilibiliLive> {
-        let result = self.get_info_by_room(live_id.parse().unwrap()).await?;
+        let result = self.get_info_by_room(live_id.parse().ok()?).await?;
         let info = result["data"]["room_info"].as_object()?;
         let id = info["room_id"].as_u64()?;
         Some(BilibiliLive {
             id,
-            url: format!("https://live.bilibili.com/{id}").parse().unwrap(),
+            url: format!("https://live.bilibili.com/{id}").parse().ok()?,
             title: info["title"].as_str()?.to_owned(),
             creator_name: result["data"]["anchor_info"]["base_info"]["uname"].as_str()?.to_owned(),
             creator_id: info["uid"].as_u64()?,
