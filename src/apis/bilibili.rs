@@ -53,13 +53,13 @@ impl Wbi {
             let data = self.client.get::<()>(&[], None).await?;
             let img_url = data["data"]["wbi_img"]["img_url"].as_str()?;
             let sub_url = data["data"]["wbi_img"]["sub_url"].as_str()?;
-            let img = &Wbi::WBI_REGEX.captures(img_url)?[1];
-            let sub = &Wbi::WBI_REGEX.captures(sub_url)?[1];
+            let img = &Self::WBI_REGEX.captures(img_url)?[1];
+            let sub = &Self::WBI_REGEX.captures(sub_url)?[1];
             let full = img.to_owned() + sub;
             let full = full.as_bytes();
-            let mut key = [0u8; Wbi::KEY_LENGTH];
-            for i in 0..Wbi::KEY_LENGTH {
-                key[i] = full[Wbi::KEY_MAP[i]];
+            let mut key = [0u8; Self::KEY_LENGTH];
+            for i in 0..Self::KEY_LENGTH {
+                key[i] = full[Self::KEY_MAP[i]];
             }
             self.key = Some(str::from_utf8(&key).ok()?.to_owned());
             self.update_time = Utc::now();
