@@ -1,8 +1,9 @@
 use std::{env, fmt::Display, sync::Arc};
 
 use bilibili::BilibiliAPI;
+use cookies::SimpleCookieJar;
 use redis::ToRedisArgs;
-use reqwest::{cookie::Jar, header::HeaderMap, Client};
+use reqwest::{header::HeaderMap, Client};
 use serde::Serialize;
 use serde_json::Value;
 use strum_macros::EnumString;
@@ -46,7 +47,7 @@ pub struct APIClient {
 }
 
 impl APIClient {
-    pub fn new(base_url: Url, headers: HeaderMap, cookies: Option<Jar>) -> Self {
+    pub fn new(base_url: Url, headers: HeaderMap, cookies: Option<SimpleCookieJar>) -> Self {
         let mut cb = Client::builder().default_headers(headers);
         if let Some(cookies) = cookies {
             cb = cb.cookie_provider(cookies.into())

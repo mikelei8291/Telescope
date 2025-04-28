@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
 use futures::{stream::{self}, StreamExt};
-use reqwest::{cookie::Jar, header::{self, HeaderMap, HeaderValue}};
+use reqwest::header::{self, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum_macros::{Display, EnumString};
@@ -11,7 +11,7 @@ use url::Url;
 
 use crate::{log_utils::LogResult, platform::{Platform, User}, subscription::Subscription};
 
-use super::{APIClient, LiveState, Metadata, API};
+use super::{cookies::SimpleCookieJar, APIClient, LiveState, Metadata, API};
 
 pub struct TwitterAPI {
     client: APIClient
@@ -94,10 +94,9 @@ impl TwitterAPI {
             )
         );
         headers.append("x-csrf-token", HeaderValue::from_str(csrf_token).expect("Invalid x-csrf-token"));
-        let cookies = Jar::default();
-        let host = base_url.host_str().expect("Invalid base URL");
-        cookies.add_cookie_str(format!("auth_token={auth_token}; Domain={host}").as_str(), &base_url);
-        cookies.add_cookie_str(format!("ct0={csrf_token}; Domain={host}").as_str(), &base_url);
+        let cookies = SimpleCookieJar::default();
+        cookies.add_cookie("auth_token", auth_token);
+        cookies.add_cookie("ct0", csrf_token);
         Self { client: APIClient::new(base_url, headers, Some(cookies)) }
     }
 
