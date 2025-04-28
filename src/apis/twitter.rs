@@ -9,7 +9,7 @@ use strum_macros::{Display, EnumString};
 use teloxide::{types::InputFile, utils::markdown::{bold, code_block_with_lang, escape, link}};
 use url::Url;
 
-use crate::{platform::{Platform, User}, subscription::Subscription};
+use crate::{log_utils::LogResult, platform::{Platform, User}, subscription::Subscription};
 
 use super::{APIClient, LiveState, Metadata, API};
 
@@ -85,7 +85,7 @@ struct AudioSpaceByIdVariables {
 
 impl TwitterAPI {
     pub fn new(auth_token: &str, csrf_token: &str) -> Self {
-        let base_url: Url = "https://x.com/i/api/".parse().unwrap();
+        let base_url: Url = "https://x.com/i/api/".parse().expect("Invalid base URL");
         let mut headers = HeaderMap::new();
         headers.append(
             header::AUTHORIZATION,
@@ -93,10 +93,11 @@ impl TwitterAPI {
                 "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
             )
         );
-        headers.append("x-csrf-token", HeaderValue::from_str(csrf_token).unwrap());
+        headers.append("x-csrf-token", HeaderValue::from_str(csrf_token).expect("Invalid x-csrf-token"));
         let cookies = Jar::default();
-        cookies.add_cookie_str(format!("auth_token={auth_token}; Domain={}", base_url.host_str().unwrap()).as_str(), &base_url);
-        cookies.add_cookie_str(format!("ct0={csrf_token}; Domain={}", base_url.host_str().unwrap()).as_str(), &base_url);
+        let host = base_url.host_str().expect("Invalid base URL");
+        cookies.add_cookie_str(format!("auth_token={auth_token}; Domain={host}").as_str(), &base_url);
+        cookies.add_cookie_str(format!("ct0={csrf_token}; Domain={host}").as_str(), &base_url);
         Self { client: APIClient::new(base_url, headers, Some(cookies)) }
     }
 
@@ -111,7 +112,7 @@ impl TwitterAPI {
         };
         let features = "{\"spaces_2022_h2_clipping\":true,\"spaces_2022_h2_spaces_communities\":true,\"responsive_web_graphql_exclude_directive_enabled\":true,\"verified_phone_label_enabled\":false,\"creator_subscriptions_tweet_preview_api_enabled\":true,\"responsive_web_graphql_skip_user_profile_image_extensions_enabled\":false,\"tweetypie_unmention_optimization_enabled\":true,\"responsive_web_edit_tweet_api_enabled\":true,\"graphql_is_translatable_rweb_tweet_is_translatable_enabled\":true,\"view_counts_everywhere_api_enabled\":true,\"longform_notetweets_consumption_enabled\":true,\"responsive_web_twitter_article_tweet_consumption_enabled\":false,\"tweet_awards_web_tipping_enabled\":false,\"freedom_of_speech_not_reach_fetch_enabled\":true,\"standardized_nudges_misinfo\":true,\"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled\":true,\"responsive_web_graphql_timeline_navigation_enabled\":true,\"longform_notetweets_rich_text_read_enabled\":true,\"longform_notetweets_inline_media_enabled\":true,\"responsive_web_media_download_video_enabled\":false,\"responsive_web_enhance_cards_enabled\":false}";
         let params = HashMap::from([
-            ("variables", serde_json::to_string(&variables).unwrap()),
+            ("variables", serde_json::to_string(&variables).ok()?),
             ("features", features.to_owned())
         ]);
         self.client.get(&[&Endpoint::GraphQL.to_string(), query_id, operation_name], Some(params)).await
@@ -122,7 +123,7 @@ impl TwitterAPI {
         let operation_name = "ProfileSpotlightsQuery";
         let variables = ProfileSpotlightsQueryVariables { screen_name };
         let params = HashMap::from([
-            ("variables", serde_json::to_string(&variables).unwrap())
+            ("variables", serde_json::to_string(&variables).ok()?)
         ]);
         self.client.get(&[&Endpoint::GraphQL.to_string(), query_id, operation_name], Some(params)).await
     }
@@ -152,23 +153,23 @@ impl API<TwitterSpace> for TwitterAPI {
     async fn live_status(&self, live_id: &String, language: Option<String>) -> Option<TwitterSpace> {
         let space = self.audio_space_by_id(live_id.clone()).await?;
         let metadata = space["data"]["audioSpace"]["metadata"].as_object()?;
-        let state = metadata["state"].as_str()?.parse().unwrap_or(LiveState::Ended);
-        let master_url = match state {
-            LiveState::Running => {
-                let live_status = self.status(metadata["media_key"].as_str()?).await?;
-                Some(live_status["source"]["location"].as_str()?
-                    .replace("dynamic_playlist.m3u8?type=live", "master_playlist.m3u8").parse().unwrap())
-            }
-            _ => None
+        let state = metadata["state"].as_str()?.parse().ok()?;
+        let master_url = if let LiveState::Running = state {
+            let live_status = self.status(metadata["media_key"].as_str()?).await?;
+            Some(live_status["source"]["location"].as_str()?
+                .replace("dynamic_playlist.m3u8?type=live", "master_playlist.m3u8").parse().log_ok("Twitter Space Playlist URL")?)
+        } else {
+            None
         };
         Some(TwitterSpace {
             id: live_id.clone(),
-            url: format!("https://twitter.com/i/spaces/{live_id}").parse().unwrap(),
+            url: format!("https://twitter.com/i/spaces/{live_id}").parse().log_ok("Twitter Space URL")?,
             title: metadata["title"].as_str()?.to_owned(),
             creator_name: metadata["creator_results"]["result"]["legacy"]["name"].as_str()?.to_owned(),
             creator_id: metadata["creator_results"]["result"]["rest_id"].as_str()?.to_owned(),
             creator_screen_name: metadata["creator_results"]["result"]["legacy"]["screen_name"].as_str()?.to_owned(),
-            creator_profile_image_url: metadata["creator_results"]["result"]["legacy"]["profile_image_url_https"].as_str()?.parse().unwrap(),
+            creator_profile_image_url:
+                metadata["creator_results"]["result"]["legacy"]["profile_image_url_https"].as_str()?.parse().log_ok("Twitter Profile Image URL")?,
             start_time: DateTime::from_timestamp_millis(metadata["started_at"].as_i64()?)?,
             state,
             language: language.unwrap_or("und".to_owned()),
@@ -182,13 +183,17 @@ impl API<TwitterSpace> for TwitterAPI {
         let mut spaces = vec![];
         for user_ids in subs.iter().map(|sub| sub.user.id.clone()).collect::<Vec<String>>().chunks(100) {
             if let Some(result) = self.avatar_content(user_ids).await {
-                spaces.extend(stream::iter(result["users"].as_object().unwrap().values()).filter_map(async |value| {
-                    let audio_space = &value["spaces"]["live_content"]["audiospace"].as_object()?;
-                    self.live_status(
-                        &audio_space.get("broadcast_id")?.as_str()?.to_owned(),
-                        Some(audio_space.get("language")?.as_str()?.to_owned())
-                    ).await.filter(|space| matches!(space.state, LiveState::Running))
-                }).collect::<Vec<_>>().await);
+                if let Some(users) = result["users"].as_object().map(|o| stream::iter(o.values())) {
+                    spaces.extend(
+                        users.filter_map(async |value| {
+                            let audio_space = &value["spaces"]["live_content"]["audiospace"].as_object()?;
+                            self.live_status(
+                                &audio_space.get("broadcast_id")?.as_str()?.to_owned(),
+                                Some(audio_space.get("language")?.as_str()?.to_owned())
+                            ).await.filter(|space| matches!(space.state, LiveState::Running))
+                        }).collect::<Vec<_>>().await
+                    );
+                }
             }
         }
         spaces
@@ -207,7 +212,11 @@ impl Display for TwitterSpace {
                     format!("@{}", escape(self.creator_screen_name.as_str())).as_str()
                 ),
                 link(self.url.as_str(), escape(self.title.as_str()).as_str()),
-                code_block_with_lang(format!("twspace_dl -ei {} -f {}", self.url, self.master_url.clone().unwrap()).as_str(), "shell")
+                code_block_with_lang(
+                    format!(
+                        "twspace_dl -ei {}{}", self.url, self.master_url.as_ref().map(|s| format!(" -f {s}")).unwrap_or_default()
+                    ).as_str(), "shell"
+                )
             ),
             LiveState::Ended | LiveState::TimedOut => write!(
                 f,
