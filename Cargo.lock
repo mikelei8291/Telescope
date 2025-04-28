@@ -1807,6 +1807,7 @@ version = "0.3.1"
 dependencies = [
  "base16ct",
  "chrono",
+ "cookie",
  "dptree",
  "futures",
  "lazy-regex",

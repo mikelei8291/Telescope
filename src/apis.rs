@@ -13,6 +13,7 @@ use url::Url;
 
 use crate::subscription::Subscription;
 
+mod cookies;
 pub mod twitter;
 pub mod bilibili;
 
