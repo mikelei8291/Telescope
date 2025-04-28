@@ -68,13 +68,13 @@ enum Endpoint {
 }
 
 #[derive(Serialize, Deserialize)]
-struct ProfileSpotlightsQueryVariables {
-    screen_name: String
+struct ProfileSpotlightsQueryVariables<'a> {
+    screen_name: &'a str
 }
 
 #[derive(Serialize, Deserialize)]
-struct AudioSpaceByIdVariables {
-    id: String,
+struct AudioSpaceByIdVariables<'a> {
+    id: &'a str,
     #[serde(rename = "isMetatagsQuery")]
     is_metatags_query: bool,
     #[serde(rename = "withReplays")]
@@ -101,7 +101,7 @@ impl TwitterAPI {
         Self { client: APIClient::new(base_url, headers, Some(cookies)) }
     }
 
-    async fn audio_space_by_id(&self, space_id: String) -> Option<Value> {
+    async fn audio_space_by_id(&self, space_id: &str) -> Option<Value> {
         let query_id = "xVEzTKg_mLTHubK5ayL0HA";
         let operation_name = "AudioSpaceById";
         let variables = AudioSpaceByIdVariables {
@@ -118,7 +118,7 @@ impl TwitterAPI {
         self.client.get(&[&Endpoint::GraphQL.to_string(), query_id, operation_name], Some(params)).await
     }
 
-    async fn profile_spotlights_query(&self, screen_name: String) -> Option<Value> {
+    async fn profile_spotlights_query(&self, screen_name: &str) -> Option<Value> {
         let query_id = "ZQEuHPrIYlvh1NAyIQHP_w";
         let operation_name = "ProfileSpotlightsQuery";
         let variables = ProfileSpotlightsQueryVariables { screen_name };
@@ -128,7 +128,7 @@ impl TwitterAPI {
         self.client.get(&[&Endpoint::GraphQL.to_string(), query_id, operation_name], Some(params)).await
     }
 
-    async fn avatar_content(&self, user_ids: &[String]) -> Option<Value> {
+    async fn avatar_content(&self, user_ids: &[&str]) -> Option<Value> {
         let version = "v1";
         let endpoint = "avatar_content";
         let params = HashMap::from([
@@ -142,8 +142,8 @@ impl TwitterAPI {
         self.client.get::<()>(&[&Endpoint::LiveVideoStream.to_string(), "status", media_key], None).await
     }
 
-    pub async fn user_id(&self, screen_name: &String) -> Option<String> {
-        let result = self.profile_spotlights_query(screen_name.to_owned()).await?;
+    pub async fn user_id(&self, screen_name: &str) -> Option<String> {
+        let result = self.profile_spotlights_query(screen_name).await?;
         let value = &result["data"]["user_result_by_screen_name"]["result"]["rest_id"];
         Some(value.as_str()?.to_string())
     }
@@ -151,7 +151,7 @@ impl TwitterAPI {
 
 impl API<TwitterSpace> for TwitterAPI {
     async fn live_status(&self, live_id: &String, language: Option<String>) -> Option<TwitterSpace> {
-        let space = self.audio_space_by_id(live_id.clone()).await?;
+        let space = self.audio_space_by_id(live_id).await?;
         let metadata = space["data"]["audioSpace"]["metadata"].as_object()?;
         let state = metadata["state"].as_str()?.parse().ok()?;
         let master_url = if let LiveState::Running = state {
@@ -181,7 +181,7 @@ impl API<TwitterSpace> for TwitterAPI {
 
     async fn user_live_status(&self, subs: Vec<Subscription>) -> Vec<TwitterSpace> {
         let mut spaces = vec![];
-        for user_ids in subs.iter().map(|sub| sub.user.id.clone()).collect::<Vec<String>>().chunks(100) {
+        for user_ids in subs.iter().map(|sub| sub.user.id.as_str()).collect::<Vec<&str>>().chunks(100) {
             if let Some(result) = self.avatar_content(user_ids).await {
                 if let Some(users) = result["users"].as_object().map(|o| stream::iter(o.values())) {
                     spaces.extend(
