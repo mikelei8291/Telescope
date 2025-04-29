@@ -16,7 +16,7 @@ use crate::{
     Bot
 };
 
-pub async fn check<T: Metadata + Display>(api: Arc<impl API<T>>, db: &mut MultiplexedConnection, bot: &Bot, platform: Platform) {
+pub async fn check<T: Metadata + Display>(api: &Arc<impl API<T>>, db: &mut MultiplexedConnection, bot: &Bot, platform: Platform) {
     let mut subs: Vec<Subscription> = vec![];
     let mut db_clone = db.clone();
     let Ok(mut iter): Result<AsyncIter<(Subscription, String)>, _> = db_clone.hscan_match("subs", format!("{platform}:*")).await else {

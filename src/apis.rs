@@ -75,15 +75,15 @@ pub static TWITTER_API: OnceCell<Arc<TwitterAPI>> = OnceCell::const_new();
 pub static BILIBILI_API: OnceCell<Arc<BilibiliAPI>> = OnceCell::const_new();
 const ENV_ERROR_MSG: &str = "Failed to load token from environment variables";
 
-pub async fn get_twitter_api() -> Arc<TwitterAPI> {
-    TWITTER_API.get_or_init(|| async {
-        Arc::new(TwitterAPI::new(
+pub async fn get_twitter_api() -> &'static Arc<TwitterAPI> {
+    TWITTER_API.get_or_init(async || {
+        TwitterAPI::new(
             &env::var("TWITTER_AUTH_TOKEN").expect(ENV_ERROR_MSG),
             &env::var("TWITTER_CSRF_TOKEN").expect(ENV_ERROR_MSG)
-        ))
-    }).await.to_owned()
+        ).into()
+    }).await
 }
 
-pub async fn get_bilibili_api() -> Arc<BilibiliAPI> {
-    BILIBILI_API.get_or_init(|| async { Arc::new(BilibiliAPI::new()) }).await.to_owned()
+pub async fn get_bilibili_api() -> &'static Arc<BilibiliAPI> {
+    BILIBILI_API.get_or_init(async || { BilibiliAPI::new().into() }).await
 }
