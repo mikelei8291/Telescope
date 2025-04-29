@@ -55,18 +55,19 @@ fn make_reply_markup(action: Action) -> InlineKeyboardMarkup {
 async fn send_reply(
     bot: &Bot, chat_id: ChatId, db: &mut MultiplexedConnection, subs: &Vec<Subscription>, action: Action
 ) -> Result<(), RequestError> {
-    let subs_list = fmt_subscriptions(&subs);
     let reply = bot.send_message(
         chat_id,
-        format!("Please confirm that you want to {action} to the following users:\n{subs_list}")
+        format!("Please confirm that you want to {action} to the following users:\n{}", fmt_subscriptions(&subs))
     ).reply_markup(make_reply_markup(action)).await?;
     let key = format!("{}:{}", reply.chat.id, reply.id);
-    redis::pipe().atomic().rpush(&key, subs).expire(&key, 86400).exec_async(db).await.unwrap();
+    if let Err(e) = redis::pipe().atomic().rpush(&key, subs).expire(&key, 86400).exec_async(db).await {
+        bot.edit_message_text(reply.chat.id, reply.id, format!("Database error: {}", escape(&e.to_string()))).await?;
+    }
     Ok(())
 }
 
 async fn process_urls(
-    bot: &Bot, msg: &Message, db: &mut MultiplexedConnection, urls: &String, action: Action
+    bot: &Bot, msg: &Message, db: &mut MultiplexedConnection, urls: String, action: Action
 ) -> Result<(), RequestError> {
     let mut subs = vec![];
     let mut errors = vec![];
@@ -76,21 +77,18 @@ async fn process_urls(
     }) {
         match Subscription::from_url(url.to_owned()).await {
             Ok(sub) => {
-                if let Ok(result) = db.sismember(msg.chat.id.to_string(), &sub).await {
-                    if result {
-                        match action {
-                            Action::Subscribe => errors.push(format!("{}: You have already subscribed to {sub}", escape(url))),
-                            Action::Unsubscribe => subs.push(sub),
-                        }
-                    } else {
-                        match action {
-                            Action::Subscribe => subs.push(sub),
-                            Action::Unsubscribe => errors.push(format!("{}: You are not subscribed to {sub}", escape(url))),
-                        }
+                match (db.sismember(msg.chat.id.0, &sub).await, &action) {
+                    (Ok(true), Action::Subscribe) => errors.push(format!("{}: You have already subscribed to {sub}", escape(url))),
+                    (Ok(true), Action::Unsubscribe) => subs.push(sub),
+                    (Ok(false), Action::Subscribe) => subs.push(sub),
+                    (Ok(false), Action::Unsubscribe) => errors.push(format!("{}: You are not subscribed to {sub}", escape(url))),
+                    (Err(e), _) => {
+                        errors.push(format!("Database error: {}", escape(&e.to_string())));
+                        break;
                     }
                 }
             },
-            Err(e) => errors.push(format!("{}: {}", escape(url), escape(e.to_string().as_str()))),
+            Err(e) => errors.push(format!("{}: {}", escape(url), escape(&e.to_string())))
         }
     }
     if errors.len() > 0 {
@@ -111,27 +109,24 @@ pub async fn command_handler(bot: Bot, msg: Message, cmd: Command, mut db: Multi
             msg.chat.id, "Welcome to the Telescope bot\\. You can view a list of available commands using the /help command\\."
         ).await?,
         Command::Help => bot.send_message(msg.chat.id, escape(Command::descriptions().to_string().as_str())).await?,
-        Command::Sub(ref urls) => return process_urls(&bot, &msg, &mut db, urls, Action::Subscribe).await,
-        Command::Del(ref urls) => return process_urls(&bot, &msg, &mut db, urls, Action::Unsubscribe).await,
+        Command::Sub(urls) => return process_urls(&bot, &msg, &mut db, urls, Action::Subscribe).await,
+        Command::Del(urls) => return process_urls(&bot, &msg, &mut db, urls, Action::Unsubscribe).await,
         Command::List => {
-            if let Ok(results) = db.smembers::<_, Vec<String>>(msg.chat.id.to_string()).await {
-                let subs = results.iter().enumerate().filter_map(|(i, r)| {
-                    Some(format!("{}\\. {}", i + 1, r.parse::<Subscription>().ok()?))
-                }).collect::<Vec<String>>().join("\n");
-                if subs.is_empty() {
-                    bot.send_message(msg.chat.id, escape("You have no subscriptions.\nUse the /sub command to add new subscriptions.")).await?
-                } else {
-                    bot.send_message(msg.chat.id, format!("Your subscriptions:\n{subs}")).await?
-                }
-            } else {
-                bot.send_message(msg.chat.id, "Database error").await?
+            match db.smembers(msg.chat.id.0).await {
+                Ok(subs) => {
+                    let sub_list = fmt_subscriptions(&subs);
+                    if sub_list.is_empty() {
+                        bot.send_message(msg.chat.id, escape("You have no subscriptions.\nUse the /sub command to add new subscriptions.")).await?
+                    } else {
+                        bot.send_message(msg.chat.id, format!("Your subscriptions:\n{sub_list}")).await?
+                    }
+                },
+                Err(e) => bot.send_message(msg.chat.id, format!("Database error: {}", escape(&e.to_string()))).await?
             }
         }
         Command::Platform => {
             let platforms = Platform::iter().enumerate()
-                .map(|(i, p)| format!("{}\\. {p}", i + 1))
-                .collect::<Vec<String>>()
-                .join("\n");
+                .map(|(i, p)| format!("{}\\. {p}", i + 1)).collect::<Vec<_>>().join("\n");
             bot.send_message(msg.chat.id, format!("Supported platforms:\n{platforms}")).await?
         }
     };
