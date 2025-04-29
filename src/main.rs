@@ -28,15 +28,16 @@ mod log_utils;
 async fn main() -> Result<(), RequestError> {
     pretty_env_logger::init();
     let bot = teloxide::Bot::from_env().parse_mode(ParseMode::MarkdownV2);
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
-    let db = client.get_multiplexed_async_connection().await.unwrap();
-    let bot_clone = bot.clone();
+    const REDIS_ERROR_MSG: &str = "Failed to connect to redis server";
+    let client = redis::Client::open("redis://127.0.0.1/").expect(REDIS_ERROR_MSG);
+    let db = client.get_multiplexed_async_connection().await.expect(REDIS_ERROR_MSG);
+    let panic_bot = bot.clone();
     let hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
         hook(info);
-        block_in_place(|| Handle::current().block_on(
-            bot_clone.send_message(env::var("BOT_OWNER").unwrap(), code_block(format!("{info}").as_str())).send()
-        )).unwrap();
+        block_in_place(|| Handle::current().block_on(async {
+            panic_bot.send_message(env::var("BOT_OWNER").ok()?, code_block(format!("{info}").as_str())).send().await.ok()
+        }));
         exit(1);
     }));
     bot.set_my_commands(Command::bot_commands()).await.expect("Loading bot commands failed.");
@@ -50,7 +51,7 @@ async fn main() -> Result<(), RequestError> {
     ).branch(
         Update::filter_callback_query().endpoint(callback_handler)
     );
-    let watcher = watch(db.clone(), bot.clone());
+    watch(db.clone(), bot.clone());
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![db])
         .default_handler(|update| async move { warn!("Unhandled update: {update:?}") })
@@ -59,6 +60,5 @@ async fn main() -> Result<(), RequestError> {
         .build()
         .dispatch()
         .await;
-    watcher.await.unwrap();
     Ok(())
 }
