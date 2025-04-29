@@ -81,8 +81,8 @@ impl Wbi {
 
 static WBI: OnceCell<Arc<Mutex<Wbi>>> = OnceCell::const_new();
 
-async fn get_wbi() -> Arc<Mutex<Wbi>> {
-    WBI.get_or_init(|| async { Arc::new(Mutex::new(Wbi::new())) }).await.to_owned()
+async fn get_wbi() -> &'static Arc<Mutex<Wbi>> {
+    WBI.get_or_init(async || { Arc::new(Mutex::new(Wbi::new())) }).await
 }
 
 pub struct BilibiliAPI {
@@ -136,9 +136,7 @@ impl BilibiliAPI {
 
     async fn get_info_by_room(&self, room_id: u64) -> Option<Value> {
         let path = "/xlive/web-room/v1/index/getInfoByRoom";
-        let mut params = BTreeMap::from([
-            ("room_id", room_id.to_string())
-        ]);
+        let mut params = BTreeMap::from([("room_id", room_id.to_string())]);
         let wbi = get_wbi().await;
         wbi.lock().await.sign(&mut params).await?;
         let result = self.client.get(&[path], Some(params)).await?;
@@ -149,7 +147,7 @@ impl BilibiliAPI {
         Some(result)
     }
 
-    pub async fn username(&self, room_id: &String) -> Option<String> {
+    pub async fn username(&self, room_id: &str) -> Option<String> {
         let result = self.get_info_by_room(room_id.parse().ok()?).await?;
         Some(result["data"]["anchor_info"]["base_info"]["uname"].as_str()?.to_owned())
     }
