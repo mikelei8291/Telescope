@@ -7,7 +7,6 @@ use teloxide::{
     dispatching::UpdateFilterExt,
     filter_command,
     prelude::{Dispatcher, LoggingErrorHandler, Request, Requester, RequesterExt},
-    respond,
     types::{Message, ParseMode, Update},
     utils::{command::BotCommands, markdown::{code_block, escape}},
     RequestError
@@ -45,8 +44,7 @@ async fn main() -> Result<(), RequestError> {
         Update::filter_message().branch(
             filter_command::<Command, _>().endpoint(command_handler)
         ).endpoint(|bot: Bot, msg: Message| async move {
-            bot.send_message(msg.chat.id, escape("Sorry, I don't understand.")).await?;
-            respond(())
+            bot.send_message(msg.chat.id, escape("Sorry, I don't understand.")).await.map(|_| ())
         })
     ).branch(
         Update::filter_callback_query().endpoint(callback_handler)
