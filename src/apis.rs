@@ -12,7 +12,7 @@ use tokio::sync::OnceCell;
 use twitter::TwitterAPI;
 use url::Url;
 
-use crate::subscription::Subscription;
+use crate::{log_utils::LogResult, subscription::Subscription};
 
 mod cookies;
 pub mod twitter;
@@ -52,26 +52,19 @@ impl APIClient {
         if let Some(cookies) = cookies {
             cb = cb.cookie_provider(cookies.into());
         }
-        let client = cb.build().unwrap();
+        let client = cb.build().expect("Failed to create API client");
         Self { base_url: base_url.parse().expect("Invalid base URL"), client }
     }
 
     pub async fn get<T: Serialize>(&self, path: &[&str], params: Option<T>) -> Option<Value> {
-        let url = self.base_url.join(&path.join("/")).unwrap();
+        let url = self.base_url.join(&path.join("/")).log_ok("Invalid request URL")?;
         let mut req = self.client.get(url.clone());
         if let Some(params) = params {
             req = req.query(&params);
         }
-        let Ok(res) = req.send().await else {
-            log::error!("API error");
-            return None;
-        };
+        let res = req.send().await.log_ok("API error")?;
         if res.status().is_success() {
-            let Ok(data) = res.json::<Value>().await else {
-                log::error!("JSON decode error");
-                return None;
-            };
-            return Some(data);
+            return res.json().await.log_ok("JSON decode error");
         }
         log::error!("{}: {}: {:?}", url, res.status(), res);
         None
@@ -80,12 +73,13 @@ impl APIClient {
 
 pub static TWITTER_API: OnceCell<Arc<TwitterAPI>> = OnceCell::const_new();
 pub static BILIBILI_API: OnceCell<Arc<BilibiliAPI>> = OnceCell::const_new();
+const ENV_ERROR_MSG: &str = "Failed to load token from environment variables";
 
 pub async fn get_twitter_api() -> Arc<TwitterAPI> {
     TWITTER_API.get_or_init(|| async {
         Arc::new(TwitterAPI::new(
-            &env::var("TWITTER_AUTH_TOKEN").unwrap(),
-            &env::var("TWITTER_CSRF_TOKEN").unwrap()
+            &env::var("TWITTER_AUTH_TOKEN").expect(ENV_ERROR_MSG),
+            &env::var("TWITTER_CSRF_TOKEN").expect(ENV_ERROR_MSG)
         ))
     }).await.to_owned()
 }
