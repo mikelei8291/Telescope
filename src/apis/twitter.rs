@@ -85,7 +85,6 @@ struct AudioSpaceByIdVariables<'a> {
 
 impl TwitterAPI {
     pub fn new(auth_token: &str, csrf_token: &str) -> Self {
-        let base_url: Url = "https://x.com/i/api/".parse().expect("Invalid base URL");
         let mut headers = HeaderMap::new();
         headers.append(
             header::AUTHORIZATION,
@@ -97,7 +96,7 @@ impl TwitterAPI {
         let cookies = SimpleCookieJar::default();
         cookies.add_cookie("auth_token", auth_token);
         cookies.add_cookie("ct0", csrf_token);
-        Self { client: APIClient::new(base_url, headers, Some(cookies)) }
+        Self { client: APIClient::new("https://x.com/i/api/", headers, Some(cookies)) }
     }
 
     async fn audio_space_by_id(&self, space_id: &str) -> Option<Value> {

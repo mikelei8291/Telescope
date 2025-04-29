@@ -42,7 +42,7 @@ impl Wbi {
             (header::USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0"))
         ]);
         Self {
-            client: APIClient::new("https://api.bilibili.com/x/web-interface/nav".parse().unwrap(), headers, None),
+            client: APIClient::new("https://api.bilibili.com/x/web-interface/nav", headers, None),
             update_time: Utc::now(),
             key: None
         }
@@ -131,7 +131,7 @@ impl BilibiliAPI {
             header::USER_AGENT,
             HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0")
         );
-        Self { client: APIClient::new("https://api.live.bilibili.com".parse().unwrap(), headers, None) }
+        Self { client: APIClient::new("https://api.live.bilibili.com", headers, None) }
     }
 
     async fn get_info_by_room(&self, room_id: u64) -> Option<Value> {

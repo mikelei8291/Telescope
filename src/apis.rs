@@ -47,13 +47,13 @@ pub struct APIClient {
 }
 
 impl APIClient {
-    pub fn new(base_url: Url, headers: HeaderMap, cookies: Option<SimpleCookieJar>) -> Self {
+    pub fn new(base_url: &str, headers: HeaderMap, cookies: Option<SimpleCookieJar>) -> Self {
         let mut cb = Client::builder().default_headers(headers);
         if let Some(cookies) = cookies {
-            cb = cb.cookie_provider(cookies.into())
+            cb = cb.cookie_provider(cookies.into());
         }
         let client = cb.build().unwrap();
-        Self { base_url, client }
+        Self { base_url: base_url.parse().expect("Invalid base URL"), client }
     }
 
     pub async fn get<T: Serialize>(&self, path: &[&str], params: Option<T>) -> Option<Value> {
