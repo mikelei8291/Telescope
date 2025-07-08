@@ -1,6 +1,6 @@
 use std::{future::Future, io::Error, num::NonZero};
 
-use redis::{aio::MultiplexedConnection, AsyncCommands, RedisResult};
+use redis::{aio::MultiplexedConnection, AsyncTypedCommands, RedisResult};
 use teloxide::{
     payloads::AnswerCallbackQuerySetters,
     prelude::Requester,
@@ -39,7 +39,7 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
     };
     let key = format!("{}:{}", msg.chat.id, msg.id);
     if data == "cancel" {  // handle cancel callback first
-        try_db::<()>(db.del(&key), &bot, &query).await?;
+        try_db(db.del(&key), &bot, &query).await?;
         return error_callback_query(&bot, &query, msg, "Cancelled").await;
     }
     let len = NonZero::new(try_db(db.llen(&key), &bot, &query).await?);
@@ -64,7 +64,7 @@ pub async fn callback_handler(bot: Bot, query: CallbackQuery, mut db: Multiplexe
                 pipe = pipe
                     .srem(query.from.id.to_string(), sub)
                     .hdel(sub, query.from.id.to_string());
-                if try_db::<u64>(db.hlen(sub), &bot, &query).await? == 1 {
+                if try_db(db.hlen(sub), &bot, &query).await? == 1 {
                     pipe = pipe.hdel("subs", sub)
                 }
             }
