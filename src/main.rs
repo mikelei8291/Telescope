@@ -34,25 +34,25 @@ async fn main() -> Result<(), RequestError> {
     let hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
         hook(info);
-        block_in_place(|| Handle::current().block_on(async {
-            panic_bot.send_message(env::var("BOT_OWNER").ok()?, code_block(format!("{info}").as_str())).send().await.ok()
-        }));
+        block_in_place(|| Handle::current().block_on(
+            panic_bot.send_message(env::var("BOT_OWNER").ok()?, code_block(format!("{info}").as_str())).send()
+        ).ok());
         exit(1);
     }));
     bot.set_my_commands(Command::bot_commands()).await.expect("Loading bot commands failed.");
     let handler = dptree::entry().branch(
         Update::filter_message().branch(
             filter_command::<Command, _>().endpoint(command_handler)
-        ).endpoint(|bot: Bot, msg: Message| async move {
-            bot.send_message(msg.chat.id, escape("Sorry, I don't understand.")).await.map(|_| ())
-        })
+        ).endpoint(async |bot: Bot, msg: Message|
+            bot.send_message(msg.chat.id, escape("Sorry, I don't understand.")).await.and(Ok(()))
+        )
     ).branch(
         Update::filter_callback_query().endpoint(callback_handler)
     );
     watch(db.clone(), bot.clone());
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![db])
-        .default_handler(|update| async move { warn!("Unhandled update: {update:?}") })
+        .default_handler(async |update| warn!("Unhandled update: {update:?}"))
         .error_handler(LoggingErrorHandler::with_custom_text("Dispatcher error"))
         .enable_ctrlc_handler()
         .build()
